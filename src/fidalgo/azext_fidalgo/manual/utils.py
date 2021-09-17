@@ -92,7 +92,6 @@ def read_yn_option():
     return ret.strip()
 
 def deployment_params_prompt():
-    print()
     print("Input the deployment parameters: ", end='')
     option = read_deploy_params()
     return option
@@ -126,3 +125,24 @@ def read_tags_input():
     while (ret == '' or ret is None):
         ret = input("Please input a valid response: ")
     return ret
+
+def validate_tags(ns):
+    """ Extracts multiple space-separated tags in key[=value] format """
+    if isinstance(ns, list):
+        tags_dict = {}
+        for item in ns:
+            tags_dict.update(validate_tag(item))
+        ns = tags_dict
+    return ns
+
+
+def validate_tag(string):
+    """ Extracts a single tag in key[=value] format """
+    result = {}
+    if string:
+        comps = string.split('=', 1)
+        val = comps[1]
+        if val.startswith('"') and string.endswith('"'):
+            val = val[1:-1]
+        result = {comps[0]: val} if len(comps) > 1 else {string: ''}
+    return result

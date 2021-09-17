@@ -25,14 +25,8 @@ fidalgo_environment = CliCommandType(
 def load_command_table(self, _):
 
     with self.command_group('fidalgo environment', fidalgo_environment, client_factory=cf_environment) as g:
-        g.custom_command('list', 'fidalgo_environment_list')
-        g.custom_show_command('show', 'fidalgo_environment_show')
-        g.custom_command('create', 'fidalgo_environment_create', supports_no_wait=True)
         g.custom_command('guided-create', 'fidalgo_environment_guided_create', supports_no_wait=True)
-        g.custom_command('update', 'fidalgo_environment_update', supports_no_wait=True)
-        g.custom_command('delete', 'fidalgo_environment_delete', supports_no_wait=True, confirmation=True)
-        g.custom_command('deploy', 'fidalgo_environment_deploy', supports_no_wait=True)
-        g.custom_wait_command('wait', 'fidalgo_environment_show')
+        g.custom_command('create', 'fidalgo_environment_create', supports_no_wait=True)
 
     with self.command_group('fidalgo', is_experimental=True):
         pass

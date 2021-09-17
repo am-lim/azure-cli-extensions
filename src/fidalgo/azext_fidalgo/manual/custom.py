@@ -13,11 +13,11 @@ from azure.cli.core.util import sdk_no_wait
 from ..generated._client_factory import cf_fidalgo_cl
 from azure.cli.core.style import print_styled_text, Style
 from .utils import (get_resource_group, create_dict, resources_exist, create_sorted_dict, print_prompt_and_options,
- get_selected_resource, region_prompt, has_deployment_params_prompt, deployment_params_prompt, print_successful_styled_text, add_tags_prompt, input_tags_prompt)
+ get_selected_resource, region_prompt, has_deployment_params_prompt, deployment_params_prompt,
+  add_tags_prompt, input_tags_prompt, validate_tags)
 from colorama import init
 from azure.cli.core.commands.validators import (
     validate_file_or_dict,
-    validate_tags
 )
 import json
 
@@ -89,34 +89,32 @@ def fidalgo_environment_guided_create(cmd, client, environment_name):
     deployment_parameters=None
     if (has_deploy_params == "y"):
         deployment_parameters= validate_file_or_dict(deployment_params_prompt())
+        deployment_parameters = json.loads(deployment_parameters)
 
-    add_tags = add_tags_prompt()
+    #tags
     tags = None
+    add_tags = add_tags_prompt()
     if (add_tags == "y"):
-        tags = validate_tags(input_tags_prompt())
+        input_tags = {"tags":  input_tags_prompt().split()}
+        tags = validate_tags(input_tags["tags"])
 
     print()
     body = {}
     if tags is not None:
         body['tags'] = tags
     body['location'] = location
-    body['description'] = "hello"
     if catalog_item is not None:
         body['catalog_item_name'] = catalog_item.name
     if deployment_parameters is not None:
-        body['deployment_parameters'] = json.loads(deployment_parameters)
+        body['deployment_parameters'] = deployment_parameters
     if environment_type is not None:
         body['environment_type'] = environment_type.name
-    ## to do show "Starting.." "Running..." and final output
-    sdk_no_wait(False,
+    return sdk_no_wait(False,
                        client.begin_create_or_update,
                        resource_group_name=resource_group_name,
                        project_name=project.name,
                        environment_name=environment_name,
                        body=body)
-    print_successful_styled_text(environment_name + " was successfully deployed.")
-    #to do: add other prompts / actions
-    return
 
 def fidalgo_environment_create(cmd, client,
                                resource_group_name,
@@ -133,48 +131,54 @@ def fidalgo_environment_create(cmd, client,
     init(autoreset=True)
     cf_fidalgo =  cf_fidalgo_cl(cmd.cli_ctx)
 
-
     #get environment types
-    environment_types = cf_fidalgo.environment_types.list_by_project(resource_group_name, project_name)
-    environment_types_dict = create_dict(environment_types)
-    if (not resources_exist("No environment types exist in the selected project, please create an environment type first", environment_types_dict)):
-        return
+    if environment_type is None:
+        environment_types = cf_fidalgo.environment_types.list_by_project(resource_group_name, project_name)
+        environment_types_dict = create_dict(environment_types)
+        if (not resources_exist("No environment types exist in the selected project, please create an environment type first", environment_types_dict)):
+            return
     
-    sorted_environment_types = create_sorted_dict(environment_types_dict)
-    print_prompt_and_options("Which type of environment are you creating?", sorted_environment_types)
-    environment_type = get_selected_resource(sorted_environment_types)
-    if (not environment_type):
-        return
+        sorted_environment_types = create_sorted_dict(environment_types_dict)
+        print_prompt_and_options("Which type of environment are you creating?", sorted_environment_types)
+        environment_type = get_selected_resource(sorted_environment_types)
+        if (not environment_type):
+            return
+        environment_type = environment_type.name
 
     #get catalog item
-    catalog_items =  cf_fidalgo.catalog_items.list_by_project(resource_group_name,project_name)
-    catalog_items_dict = create_dict(catalog_items)
-    if (not resources_exist("No catalog items exist in the selected project, please create an catalog item first", catalog_items_dict)):
-        return
+    if catalog_item_name is None:
+        catalog_items =  cf_fidalgo.catalog_items.list_by_project(resource_group_name,project_name)
+        catalog_items_dict = create_dict(catalog_items)
+        if (not resources_exist("No catalog items exist in the selected project, please create an catalog item first", catalog_items_dict)):
+            return
 
-    sorted_catalog_items = create_sorted_dict(catalog_items_dict)
-    print_prompt_and_options("What catalog item should the environment use?", sorted_catalog_items)
-    catalog_item = get_selected_resource(sorted_catalog_items)
-    if (not catalog_item):
-        return
+        sorted_catalog_items = create_sorted_dict(catalog_items_dict)
+        print_prompt_and_options("What cataalog item should the environment use?", sorted_catalog_items)
+        catalog_item = get_selected_resource(sorted_catalog_items)
+        catalog_item_name = catalog_item.name
+        if (not catalog_item):
+            return
     
     #get location
+    #NOTE: if location is not provided will choose default automatically
     location = region_prompt()
     if (location == "quit"):
         return
     print_styled_text([(Style.ACTION, "Your selection: "), (Style.PRIMARY, location )])
 
     #deploy params
-    has_deploy_params = has_deployment_params_prompt()
-    deployment_parameters=None
-    if (has_deploy_params == "y"):
-        deployment_parameters= validate_file_or_dict(deployment_params_prompt())
-        print()
+    if deployment_parameters is None:
+        has_deploy_params = has_deployment_params_prompt()
+        if (has_deploy_params == "y"):
+            deployment_parameters= validate_file_or_dict(deployment_params_prompt())
+            deployment_parameters = json.loads(deployment_parameters)
 
-    add_tags = add_tags_prompt()
-    tags = None
-    if (add_tags == "y"):
-        tags = validate_tags(input_tags_prompt())
+    #tags
+    if tags is None:
+        add_tags = add_tags_prompt()
+        if (add_tags == "y"):
+            input_tags = {"tags":  input_tags_prompt().split()}
+            tags = validate_tags(input_tags["tags"])
 
     body = {}
     if tags is not None:
@@ -182,18 +186,19 @@ def fidalgo_environment_create(cmd, client,
     body['location'] = location
     if description is not None:
         body['description'] = description
-    if catalog_item is not None:
-        body['catalog_item_name'] = catalog_item.name
+    if catalog_item_name is not None:
+        body['catalog_item_name'] = catalog_item_name
     if template_uri is not None:
         body['template_uri'] = template_uri
     if deployment_parameters is not None:
-        body['deployment_parameters'] = json.loads(deployment_parameters)
+        body['deployment_parameters'] = deployment_parameters
     if environment_type is not None:
-        body['environment_type'] = environment_type.name
-    ## to do - show "Starting.." "Running..." and final output
+        body['environment_type'] = environment_type
+
     return sdk_no_wait(no_wait,
                        client.begin_create_or_update,
                        resource_group_name=resource_group_name,
                        project_name=project_name,
                        environment_name=environment_name,
                        body=body)
+
