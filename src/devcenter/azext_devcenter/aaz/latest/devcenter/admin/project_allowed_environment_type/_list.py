@@ -24,7 +24,7 @@ class List(AAZCommand):
     _aaz_info = {
         "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}/allowedenvironmenttypes", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/private.devcenter/projects/{}/allowedenvironmenttypes", "2023-06-01-preview"],
         ]
     }
 
@@ -87,7 +87,7 @@ class List(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/projects/{projectName}/allowedEnvironmentTypes",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Private.DevCenter/projects/{projectName}/allowedEnvironmentTypes",
                 **self.url_parameters
             )
 

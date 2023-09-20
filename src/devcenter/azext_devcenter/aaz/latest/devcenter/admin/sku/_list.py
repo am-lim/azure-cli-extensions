@@ -15,7 +15,7 @@ from azure.cli.core.aaz import *
     "devcenter admin sku list",
 )
 class List(AAZCommand):
-    """List the Microsoft.DevCenter SKUs available in a subscription.
+    """List the Private.DevCenter SKUs available in a subscription.
 
     :example: List
         az devcenter admin sku list
@@ -24,7 +24,7 @@ class List(AAZCommand):
     _aaz_info = {
         "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/providers/microsoft.devcenter/skus", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/providers/private.devcenter/skus", "2023-06-01-preview"],
         ]
     }
 
@@ -77,7 +77,7 @@ class List(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/providers/Microsoft.DevCenter/skus",
+                "/subscriptions/{subscriptionId}/providers/Private.DevCenter/skus",
                 **self.url_parameters
             )
 
