@@ -18,13 +18,13 @@ class Create(AAZCommand):
     """Create a dev box definition.
 
     :example: Create
-        az devcenter admin devbox-definition create --location "eastus" --image-reference id="/subscriptions/0ac520ee-14c0-480f-b6c9-0a90c58ffff/resourceGroups/Example/providers/Microsoft.DevCenter/devcenters/Contoso/galleries/contosogallery/images/exampleImage/version/1.0.0" --os-storage-type "ssd_1024gb" --sku name="general_a_8c32gb1024ssd_v2" --name "WebDevBox" --dev-center-name "Contoso" --resource-group "rg1"
+        az devcenter admin devbox-definition create --location "eastus" --image-reference id="/subscriptions/0ac520ee-14c0-480f-b6c9-0a90c58ffff/resourceGroups/Example/providers/Private.DevCenter/devcenters/Contoso/galleries/contosogallery/images/exampleImage/version/1.0.0" --os-storage-type "ssd_1024gb" --sku name="general_a_8c32gb1024ssd_v2" --name "WebDevBox" --dev-center-name "Contoso" --resource-group "rg1"
     """
 
     _aaz_info = {
         "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/devcenters/{}/devboxdefinitions/{}", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/private.devcenter/devcenters/{}/devboxdefinitions/{}", "2023-06-01-preview"],
         ]
     }
 
@@ -183,7 +183,7 @@ class Create(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/devcenters/{devCenterName}/devboxdefinitions/{devBoxDefinitionName}",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Private.DevCenter/devcenters/{devCenterName}/devboxdefinitions/{devBoxDefinitionName}",
                 **self.url_parameters
             )
 

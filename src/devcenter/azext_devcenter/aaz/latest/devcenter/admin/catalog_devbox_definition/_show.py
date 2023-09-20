@@ -12,15 +12,19 @@ from azure.cli.core.aaz import *
 
 
 @register_command(
-    "devcenter admin devcenter wait",
+    "devcenter admin catalog-devbox-definition show",
 )
-class Wait(AAZWaitCommand):
-    """Place the CLI in a waiting state until a condition is met.
+class Show(AAZCommand):
+    """Get a dev box definition from the catalog
+
+    :example: Get
+        az devcenter admin catalog-devbox-definition show --catalog-name "CentralCatalog" -devbox-definition-name "devBoxDef" --dev-center-name "Contoso" --resource-group "rg1"
     """
 
     _aaz_info = {
+        "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/private.devcenter/devcenters/{}", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/private.devcenter/devcenters/{}/catalogs/{}/devboxdefinitions/{}", "2023-06-01-preview"],
         ]
     }
 
@@ -40,8 +44,20 @@ class Wait(AAZWaitCommand):
         # define Arg Group ""
 
         _args_schema = cls._args_schema
-        _args_schema.name = AAZStrArg(
-            options=["-n", "--name"],
+        _args_schema.catalog_name = AAZStrArg(
+            options=["--catalog-name"],
+            help="The name of the catalog.",
+            required=True,
+            id_part="child_name_1",
+        )
+        _args_schema.devbox_definition_name = AAZStrArg(
+            options=["-n", "--name", "--devbox-definition-name"],
+            help="The name of the dev box definition.",
+            required=True,
+            id_part="child_name_2",
+        )
+        _args_schema.dev_center_name = AAZStrArg(
+            options=["-d", "--dev-center", "--dev-center-name"],
             help="The name of the dev center.",
             required=True,
             id_part="name",
@@ -53,7 +69,7 @@ class Wait(AAZWaitCommand):
 
     def _execute_operations(self):
         self.pre_operations()
-        self.DevCentersGet(ctx=self.ctx)()
+        self.CatalogDevBoxDefinitionsGet(ctx=self.ctx)()
         self.post_operations()
 
     @register_callback
@@ -65,10 +81,10 @@ class Wait(AAZWaitCommand):
         pass
 
     def _output(self, *args, **kwargs):
-        result = self.deserialize_output(self.ctx.vars.instance, client_flatten=False)
+        result = self.deserialize_output(self.ctx.vars.instance, client_flatten=True)
         return result
 
-    class DevCentersGet(AAZHttpOperation):
+    class CatalogDevBoxDefinitionsGet(AAZHttpOperation):
         CLIENT_TYPE = "MgmtClient"
 
         def __call__(self, *args, **kwargs):
@@ -82,7 +98,7 @@ class Wait(AAZWaitCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Private.DevCenter/devcenters/{devCenterName}",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Private.DevCenter/devcenters/{devCenterName}/catalogs/{catalogName}/devboxdefinitions/{devBoxDefinitionName}",
                 **self.url_parameters
             )
 
@@ -98,7 +114,15 @@ class Wait(AAZWaitCommand):
         def url_parameters(self):
             parameters = {
                 **self.serialize_url_param(
-                    "devCenterName", self.ctx.args.name,
+                    "catalogName", self.ctx.args.catalog_name,
+                    required=True,
+                ),
+                **self.serialize_url_param(
+                    "devBoxDefinitionName", self.ctx.args.devbox_definition_name,
+                    required=True,
+                ),
+                **self.serialize_url_param(
+                    "devCenterName", self.ctx.args.dev_center_name,
                     required=True,
                 ),
                 **self.serialize_url_param(
@@ -152,7 +176,6 @@ class Wait(AAZWaitCommand):
             _schema_on_200.id = AAZStrType(
                 flags={"read_only": True},
             )
-            _schema_on_200.identity = AAZObjectType()
             _schema_on_200.location = AAZStrType(
                 flags={"required": True},
             )
@@ -171,69 +194,62 @@ class Wait(AAZWaitCommand):
                 flags={"read_only": True},
             )
 
-            identity = cls._schema_on_200.identity
-            identity.principal_id = AAZStrType(
-                serialized_name="principalId",
-                flags={"read_only": True},
+            properties = cls._schema_on_200.properties
+            properties.active_image_reference = AAZObjectType(
+                serialized_name="activeImageReference",
             )
-            identity.tenant_id = AAZStrType(
-                serialized_name="tenantId",
-                flags={"read_only": True},
+            _ShowHelper._build_schema_image_reference_read(properties.active_image_reference)
+            properties.hibernate_support = AAZStrType(
+                serialized_name="hibernateSupport",
             )
-            identity.type = AAZStrType(
+            properties.image_reference = AAZObjectType(
+                serialized_name="imageReference",
                 flags={"required": True},
             )
-            identity.user_assigned_identities = AAZDictType(
-                serialized_name="userAssignedIdentities",
+            _ShowHelper._build_schema_image_reference_read(properties.image_reference)
+            properties.image_validation_error_details = AAZObjectType(
+                serialized_name="imageValidationErrorDetails",
             )
-
-            user_assigned_identities = cls._schema_on_200.identity.user_assigned_identities
-            user_assigned_identities.Element = AAZObjectType()
-
-            _element = cls._schema_on_200.identity.user_assigned_identities.Element
-            _element.client_id = AAZStrType(
-                serialized_name="clientId",
-                flags={"read_only": True},
+            properties.image_validation_status = AAZStrType(
+                serialized_name="imageValidationStatus",
             )
-            _element.principal_id = AAZStrType(
-                serialized_name="principalId",
-                flags={"read_only": True},
+            properties.os_storage_type = AAZStrType(
+                serialized_name="osStorageType",
             )
-
-            properties = cls._schema_on_200.properties
-            properties.dev_center_uri = AAZStrType(
-                serialized_name="devCenterUri",
-                flags={"read_only": True},
-            )
-            properties.encryption = AAZObjectType()
             properties.provisioning_state = AAZStrType(
                 serialized_name="provisioningState",
                 flags={"read_only": True},
             )
-
-            encryption = cls._schema_on_200.properties.encryption
-            encryption.customer_managed_key_encryption = AAZObjectType(
-                serialized_name="customerManagedKeyEncryption",
+            properties.sku = AAZObjectType(
+                flags={"required": True},
+            )
+            properties.validation_error_details = AAZListType(
+                serialized_name="validationErrorDetails",
+                flags={"read_only": True},
+            )
+            properties.validation_status = AAZStrType(
+                serialized_name="validationStatus",
             )
 
-            customer_managed_key_encryption = cls._schema_on_200.properties.encryption.customer_managed_key_encryption
-            customer_managed_key_encryption.key_encryption_key_identity = AAZObjectType(
-                serialized_name="keyEncryptionKeyIdentity",
-            )
-            customer_managed_key_encryption.key_encryption_key_url = AAZStrType(
-                serialized_name="keyEncryptionKeyUrl",
-            )
+            image_validation_error_details = cls._schema_on_200.properties.image_validation_error_details
+            image_validation_error_details.code = AAZStrType()
+            image_validation_error_details.message = AAZStrType()
 
-            key_encryption_key_identity = cls._schema_on_200.properties.encryption.customer_managed_key_encryption.key_encryption_key_identity
-            key_encryption_key_identity.delegated_identity_client_id = AAZStrType(
-                serialized_name="delegatedIdentityClientId",
+            sku = cls._schema_on_200.properties.sku
+            sku.capacity = AAZIntType()
+            sku.family = AAZStrType()
+            sku.name = AAZStrType(
+                flags={"required": True},
             )
-            key_encryption_key_identity.identity_type = AAZStrType(
-                serialized_name="identityType",
-            )
-            key_encryption_key_identity.user_assigned_identity_resource_id = AAZStrType(
-                serialized_name="userAssignedIdentityResourceId",
-            )
+            sku.size = AAZStrType()
+            sku.tier = AAZStrType()
+
+            validation_error_details = cls._schema_on_200.properties.validation_error_details
+            validation_error_details.Element = AAZObjectType()
+
+            _element = cls._schema_on_200.properties.validation_error_details.Element
+            _element.code = AAZStrType()
+            _element.message = AAZStrType()
 
             system_data = cls._schema_on_200.system_data
             system_data.created_at = AAZStrType(
@@ -261,8 +277,29 @@ class Wait(AAZWaitCommand):
             return cls._schema_on_200
 
 
-class _WaitHelper:
-    """Helper class for Wait"""
+class _ShowHelper:
+    """Helper class for Show"""
+
+    _schema_image_reference_read = None
+
+    @classmethod
+    def _build_schema_image_reference_read(cls, _schema):
+        if cls._schema_image_reference_read is not None:
+            _schema.exact_version = cls._schema_image_reference_read.exact_version
+            _schema.id = cls._schema_image_reference_read.id
+            return
+
+        cls._schema_image_reference_read = _schema_image_reference_read = AAZObjectType()
+
+        image_reference_read = _schema_image_reference_read
+        image_reference_read.exact_version = AAZStrType(
+            serialized_name="exactVersion",
+            flags={"read_only": True},
+        )
+        image_reference_read.id = AAZStrType()
+
+        _schema.exact_version = cls._schema_image_reference_read.exact_version
+        _schema.id = cls._schema_image_reference_read.id
 
 
-__all__ = ["Wait"]
+__all__ = ["Show"]

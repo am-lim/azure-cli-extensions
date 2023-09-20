@@ -18,13 +18,13 @@ class Create(AAZCommand):
     """Create an attached network connection.
 
     :example: Create
-        az devcenter admin attached-network create --attached-network-connection-name "network-uswest3" --network-connection-id "/subscriptions/0ac520ee-14c0-480f-b6c9-0a90c58ffff/resourceGroups/rg1/providers/Microsoft.DevCenter/NetworkConnections/network-uswest3" --dev-center-name "Contoso" --resource-group "rg1"
+        az devcenter admin attached-network create --attached-network-connection-name "network-uswest3" --network-connection-id "/subscriptions/0ac520ee-14c0-480f-b6c9-0a90c58ffff/resourceGroups/rg1/providers/Private.D/NetworkConnections/network-uswest3" --dev-center-name "Contoso" --resource-group "rg1"
     """
 
     _aaz_info = {
         "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/devcenters/{}/attachednetworks/{}", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/private.devcenter/devcenters/{}/attachednetworks/{}", "2023-06-01-preview"],
         ]
     }
 
@@ -116,7 +116,7 @@ class Create(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/devcenters/{devCenterName}/attachednetworks/{attachedNetworkConnectionName}",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Private.D/devcenters/{devCenterName}/attachednetworks/{attachedNetworkConnectionName}",
                 **self.url_parameters
             )
 

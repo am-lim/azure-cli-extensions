@@ -27,8 +27,8 @@ class List(AAZCommand):
     _aaz_info = {
         "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/providers/microsoft.devcenter/networkconnections", "2023-06-01-preview"],
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/networkconnections", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/providers/private.devcenter/networkconnections", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/private.devcenter/networkconnections", "2023-06-01-preview"],
         ]
     }
 
@@ -89,7 +89,7 @@ class List(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/networkConnections",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Private.DevCenter/networkConnections",
                 **self.url_parameters
             )
 
@@ -257,7 +257,7 @@ class List(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/providers/Microsoft.DevCenter/networkConnections",
+                "/subscriptions/{subscriptionId}/providers/Private.DevCenter/networkConnections",
                 **self.url_parameters
             )
 

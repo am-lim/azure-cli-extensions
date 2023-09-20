@@ -18,13 +18,13 @@ class Create(AAZCommand):
     """Create a project.
 
     :example: Create
-        az devcenter admin project create --location "eastus" --description "This is my first project." --dev-center-id "/subscriptions/0ac520ee-14c0-480f-b6c9-0a90c58ffff/resourceGroups/rg1/providers/Microsoft.DevCenter/devcenters/Contoso" --tags CostCenter="R&D" --name "DevProject" --resource-group "rg1" --max-dev-boxes-per-user "3"
+        az devcenter admin project create --location "eastus" --description "This is my first project." --dev-center-id "/subscriptions/0ac520ee-14c0-480f-b6c9-0a90c58ffff/resourceGroups/rg1/providers/Private.DevCenter/devcenters/Contoso" --tags CostCenter="R&D" --name "DevProject" --resource-group "rg1" --max-dev-boxes-per-user "3"
     """
 
     _aaz_info = {
         "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/private.devcenter/projects/{}", "2023-06-01-preview"],
         ]
     }
 
@@ -144,7 +144,7 @@ class Create(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/projects/{projectName}",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Private.DevCenter/projects/{projectName}",
                 **self.url_parameters
             )
 

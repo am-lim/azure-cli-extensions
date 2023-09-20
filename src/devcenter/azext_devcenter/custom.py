@@ -25,6 +25,11 @@ from .aaz.latest.devcenter.admin.catalog import (
     Sync as _CatalogSync,
     Update as _CatalogUpdate,
     Wait as _CatalogWait,
+    Connect as _CatalogConnect,
+)
+from .aaz.latest.devcenter.admin.catalog_devbox_definition import (
+    List as _CatalogDevBoxDefinitionList,
+    Show as _CatalogDevBoxDefinitionShow,
 )
 from .aaz.latest.devcenter.admin.check_name_availability import (
     Execute as _CheckNameAvailabilityExecute,
@@ -204,12 +209,25 @@ class CatalogUpdate(_CatalogUpdate):
         args = super()._cli_arguments_loader()
         return set_configured_defaults(args)
 
+class CatalogConnect(_CatalogConnect):
+    def _cli_arguments_loader(self):
+        args = super()._cli_arguments_loader()
+        return set_configured_defaults(args)
 
 class CatalogWait(_CatalogWait):
     def _cli_arguments_loader(self):
         args = super()._cli_arguments_loader()
         return set_configured_defaults(args)
 
+class CatalogDevBoxDefinitionList(_CatalogDevBoxDefinitionList):
+    def _cli_arguments_loader(self):
+        args = super()._cli_arguments_loader()
+        return set_configured_defaults(args)
+
+class CatalogDevBoxDefinitionShow(_CatalogDevBoxDefinitionShow):
+    def _cli_arguments_loader(self):
+        args = super()._cli_arguments_loader()
+        return set_configured_defaults(args)
 
 class DevBoxDefinitionCreate(_DevBoxDefinitionCreate):
     @classmethod

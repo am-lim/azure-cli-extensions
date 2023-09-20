@@ -26,6 +26,9 @@ from .custom import (
     CatalogSync,
     CatalogUpdate,
     CatalogWait,
+    CatalogConnect,
+    CatalogDevBoxDefinitionList,
+    CatalogDevBoxDefinitionShow,
     DevBoxDefinitionCreate,
     DevBoxDefinitionDelete,
     DevBoxDefinitionList,
@@ -54,6 +57,7 @@ from .custom import (
     PoolUpdate,
     PoolWait,
     ProjectCreate,
+    PoolRunHealthCheck,
     ProjectAllowedEnvironmentTypeList,
     ProjectAllowedEnvironmentTypeShow,
     ProjectEnvironmentTypeCreate,
@@ -98,6 +102,10 @@ def load_command_table(self, _):
     self.command_table["devcenter admin catalog sync"] = CatalogSync(loader=self)
     self.command_table["devcenter admin catalog update"] = CatalogUpdate(loader=self)
     self.command_table["devcenter admin catalog wait"] = CatalogWait(loader=self)
+    self.command_table["devcenter admin catalog connect"] = CatalogConnect(loader=self)
+
+    self.command_table["devcenter admin catalog-devbox-definition list"] = CatalogDevBoxDefinitionList(loader=self)
+    self.command_table["devcenter admin catalog-devbox-definition show"] = CatalogDevBoxDefinitionShow(loader=self)
 
     self.command_table[
         "devcenter admin devbox-definition create"
@@ -160,6 +168,7 @@ def load_command_table(self, _):
     self.command_table["devcenter admin pool show"] = PoolShow(loader=self)
     self.command_table["devcenter admin pool update"] = PoolUpdate(loader=self)
     self.command_table["devcenter admin pool wait"] = PoolWait(loader=self)
+    self.command_table["devcenter admin pool run-health-check"] = PoolRunHealthCheck(loader=self)
 
     self.command_table["devcenter admin project create"] = ProjectCreate(loader=self)
 

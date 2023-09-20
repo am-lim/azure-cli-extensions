@@ -18,13 +18,13 @@ class Execute(AAZCommand):
     """Check the availability of name for resource.
 
     :example: Check name availability
-        az devcenter admin check-name-availability execute --name "name1" --type "Microsoft.DevCenter/devcenters"
+        az devcenter admin check-name-availability execute --name "name1" --type "Private.DevCenter/devcenters"
     """
 
     _aaz_info = {
         "version": "2023-06-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/providers/microsoft.devcenter/checknameavailability", "2023-06-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/providers/private.devcenter/checknameavailability", "2023-06-01-preview"],
         ]
     }
 
@@ -89,7 +89,7 @@ class Execute(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/providers/Microsoft.DevCenter/checkNameAvailability",
+                "/subscriptions/{subscriptionId}/providers/Private.DevCenter/checkNameAvailability",
                 **self.url_parameters
             )
 
