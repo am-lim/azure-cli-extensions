@@ -684,3 +684,21 @@ helps[
 --project-name "DevProject" --name "myEnv" --operation-id \
 "f5dbdfab-fa0e-4831-8d13-25359aa5e680" --user-id "00000000-0000-0000-0000-000000000000"
 """
+
+helps[
+    "devcenter dev environment show-operation-logs"
+] = """
+    type: command
+    short-summary: "Gets the logs for an operation on an environment."
+    examples:
+      - name: Get operation logs using dev center
+        text: |-
+               az devcenter dev environment show-operation-logs --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --name "myEnv" --operation-id \
+"f5dbdfab-fa0e-4831-8d13-25359aa5e680" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: Get operation logs using endpoint
+        text: |-
+               az devcenter dev environment show-operation-logs --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --name "myEnv" --operation-id \
+"f5dbdfab-fa0e-4831-8d13-25359aa5e680" --user-id "00000000-0000-0000-0000-000000000000"
+"""

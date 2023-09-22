@@ -209,25 +209,30 @@ class CatalogUpdate(_CatalogUpdate):
         args = super()._cli_arguments_loader()
         return set_configured_defaults(args)
 
+
 class CatalogConnect(_CatalogConnect):
     def _cli_arguments_loader(self):
         args = super()._cli_arguments_loader()
         return set_configured_defaults(args)
+
 
 class CatalogWait(_CatalogWait):
     def _cli_arguments_loader(self):
         args = super()._cli_arguments_loader()
         return set_configured_defaults(args)
 
+
 class CatalogDevBoxDefinitionList(_CatalogDevBoxDefinitionList):
     def _cli_arguments_loader(self):
         args = super()._cli_arguments_loader()
         return set_configured_defaults(args)
 
+
 class CatalogDevBoxDefinitionShow(_CatalogDevBoxDefinitionShow):
     def _cli_arguments_loader(self):
         args = super()._cli_arguments_loader()
         return set_configured_defaults(args)
+
 
 class DevBoxDefinitionCreate(_DevBoxDefinitionCreate):
     @classmethod
@@ -1146,5 +1151,17 @@ def devcenter_environment_operation_show(
     )
 
     return cf_dataplane.environment_operations.get_by_environment(
+        project_name=project_name, operation_id=operation_id, user_id=user_id, environment_name=environment_name
+    )
+
+
+def devcenter_environment_operation_show_logs(
+    cmd, project_name, environment_name, operation_id, user_id="me", dev_center=None, endpoint=None
+):
+    cf_dataplane = cf_devcenter_dataplane(
+        cmd.cli_ctx, endpoint, dev_center, project_name
+    )
+
+    return cf_dataplane.environment_operations.get_logs(
         project_name=project_name, operation_id=operation_id, user_id=user_id, environment_name=environment_name
     )

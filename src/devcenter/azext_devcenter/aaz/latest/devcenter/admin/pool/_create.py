@@ -105,6 +105,21 @@ class Create(AAZCommand):
             arg_group="Properties",
             help="Name of a network connection in parent project of this pool.",
         )
+        _args_schema.stop_on_disconnect = AAZObjectArg(
+            options=["--stop-on-disconnect"],
+            arg_group="Properties",
+            help="Stop on disconnect configuration settings for dev boxes created in this pool.",
+        )
+        stop_on_disconnect = cls._args_schema.stop_on_disconnect
+        stop_on_disconnect.grace_period_minutes = AAZIntArg(
+            options=["grace-period-minutes"],
+            help="The specified time in minutes to wait before stopping a dev box once disconnect is detected.",
+        )
+        stop_on_disconnect.status = AAZStrArg(
+            options=["status"],
+            help="Whether the feature to stop the dev box on disconnect once the grace period has lapsed is enabled.",
+            enum={"Disabled": "Disabled", "Enabled": "Enabled"},
+        )
         return cls._args_schema
 
     def _execute_operations(self):
