@@ -281,6 +281,9 @@ def load_command_table(self, _):
             supports_no_wait=True,
             confirmation=True,
         )
+        g.custom_command("list-operation", "devcenter_environment_operation_list")
+        g.custom_command("show-operation", "devcenter_environment_operation_show")
+        g.custom_command("show-operation-logs", "devcenter_environment_operation_show_logs")
 
     with self.command_group("devcenter dev catalog", environments_dp) as g:
         g.custom_command("list", "devcenter_catalog_list_dp")
