@@ -89,3 +89,14 @@ def get_delayed_time(delay_time, action_time):
     hours = int(split_time[0])
     minutes = int(split_time[1])
     return action_time + timedelta(hours=hours, minutes=minutes)
+
+def get_rp_namespace(url_parameters):
+     if 'privateRp' in url_parameters:
+        namespace = {"namespace": 'Private.DevCenter'}
+     else:
+        namespace = {"namespace": 'Microsoft.DevCenter'}
+     return namespace
+    
+def get_url_parameters(url_parameters, namespace):
+     parameters = {**url_parameters, **namespace}
+     return parameters

@@ -12,7 +12,7 @@ from azure.cli.core.aaz import register_callback
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.cli.core.util import sdk_no_wait
 from ._client_factory import cf_devcenter_dataplane
-from .utils import get_project_arg, get_earliest_time, get_delayed_time
+from .utils import get_project_arg, get_earliest_time, get_delayed_time, get_rp_namespace, get_url_parameters
 from .aaz.latest.devcenter.admin.attached_network import (
     Create as _AttachedNetworkCreate,
     Delete as _AttachedNetworkDelete,
@@ -100,7 +100,14 @@ from ._validators import (
     validate_pool_create,
 )
 
+from azure.cli.core._profile import Profile
+
 # Control plane
+
+# Private RP subscriptions
+subscriptions = ['6e46cd56-c1c0-44f3-97fa-ae16761b6df7']
+profile = Profile()
+subscriptionId = profile.get_subscription()['id']
 
 
 def set_configured_defaults(args):
@@ -438,8 +445,16 @@ class ProjectCreate(_ProjectCreate):
     @classmethod
     def _build_arguments_schema(cls, *args, **kwargs):
         args_schema = super()._build_arguments_schema(*args, **kwargs)
+        if subscriptionId in subscriptions:
+             args_schema.private_rp._registered = True
+        else:
+             args_schema.private_rp._registered = False
         args_schema.dev_center_id._required = True
         return args_schema
+
+    def _cli_arguments_loader(self):
+        args = super()._cli_arguments_loader()
+        return set_configured_defaults(args)
 
 
 class ProjectAllowedEnvironmentTypeList(_ProjectAllowedEnvironmentTypeList):

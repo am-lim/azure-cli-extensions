@@ -9,6 +9,7 @@
 # flake8: noqa
 
 from azure.cli.core.aaz import *
+from azure.cli.core._profile import Profile
 
 
 @register_command(
@@ -105,6 +106,10 @@ class Create(AAZCommand):
                 minimum=0,
             ),
         )
+        _args_schema.enable_private_rp = AAZBoolArg(
+            options=["--enable-private-rp"],
+            help="Whether to enable private RP support",
+        )
         return cls._args_schema
 
     def _execute_operations(self):
@@ -153,9 +158,14 @@ class Create(AAZCommand):
 
         @property
         def url(self):
+            if 'privateRp' in self.url_parameters:
+                namespace = {"namespace": 'Private.DevCenter'}
+            else:
+                namespace = {"namespace": 'Microsoft.DevCenter'}
+            parameters = {**self.url_parameters, **namespace}
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/projects/{projectName}",
-                **self.url_parameters
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{namespace}/projects/{projectName}",
+                **parameters
             )
 
         @property
@@ -180,6 +190,10 @@ class Create(AAZCommand):
                 **self.serialize_url_param(
                     "subscriptionId", self.ctx.subscription_id,
                     required=True,
+                ),
+                **self.serialize_url_param(
+                    "privateRp", self.ctx.args.private_rp,
+                    required=False
                 ),
             }
             return parameters
