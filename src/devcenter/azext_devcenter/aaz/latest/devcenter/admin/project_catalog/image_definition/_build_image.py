@@ -12,19 +12,20 @@ from azure.cli.core.aaz import *
 
 
 @register_command(
-    "devcenter admin pool run-health-check",
+    "devcenter admin project-catalog image-definition build-image",
+    is_preview=True,
 )
-class RunHealthCheck(AAZCommand):
-    """Triggers a refresh of the pool status.
+class BuildImage(AAZCommand):
+    """Builds an image for the specified Image Definition.
 
-    :example: Run health check
-        az devcenter admin pool run-health-check --name "DevPool" --project-name "DevProject" --resource-group "rg1"
+    :example: Build image
+        az devcenter admin project-catalog image-definition build-image --catalog-name "CentralCatalog" --image-definition-name "DefaultDevImage" --project-name "DevProject" --resource-group "rg1"
     """
 
     _aaz_info = {
         "version": "2024-07-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}/pools/{}/runhealthchecks", "2024-07-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}/catalogs/{}/imagedefinitions/{}/buildimage", "2024-07-01-preview"],
         ]
     }
 
@@ -45,11 +46,22 @@ class RunHealthCheck(AAZCommand):
         # define Arg Group ""
 
         _args_schema = cls._args_schema
-        _args_schema.pool_name = AAZStrArg(
-            options=["-n", "--name", "--pool-name"],
-            help="Name of the pool.",
+        _args_schema.catalog_name = AAZStrArg(
+            options=["--catalog-name"],
+            help="The name of the Catalog.",
             required=True,
             id_part="child_name_1",
+            fmt=AAZStrArgFormat(
+                pattern="^[a-zA-Z0-9][a-zA-Z0-9-_.]{2,62}$",
+                max_length=63,
+                min_length=3,
+            ),
+        )
+        _args_schema.image_definition_name = AAZStrArg(
+            options=["-n", "--name", "--image-definition-name"],
+            help="The name of the Image Definition.",
+            required=True,
+            id_part="child_name_2",
             fmt=AAZStrArgFormat(
                 pattern="^[a-zA-Z0-9][a-zA-Z0-9-_.]{2,62}$",
                 max_length=63,
@@ -60,6 +72,7 @@ class RunHealthCheck(AAZCommand):
             options=["--project", "--project-name"],
             help="The name of the project. Use `az configure -d project=<project_name>` to configure a default.",
             required=True,
+            is_preview=True,
             id_part="name",
             fmt=AAZStrArgFormat(
                 pattern="^[a-zA-Z0-9][a-zA-Z0-9-_.]{2,62}$",
@@ -74,7 +87,7 @@ class RunHealthCheck(AAZCommand):
 
     def _execute_operations(self):
         self.pre_operations()
-        yield self.PoolsRunHealthChecks(ctx=self.ctx)()
+        yield self.ProjectCatalogImageDefinitionsBuildImage(ctx=self.ctx)()
         self.post_operations()
 
     @register_callback
@@ -85,7 +98,7 @@ class RunHealthCheck(AAZCommand):
     def post_operations(self):
         pass
 
-    class PoolsRunHealthChecks(AAZHttpOperation):
+    class ProjectCatalogImageDefinitionsBuildImage(AAZHttpOperation):
         CLIENT_TYPE = "MgmtClient"
 
         def __call__(self, *args, **kwargs):
@@ -106,7 +119,7 @@ class RunHealthCheck(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/projects/{projectName}/pools/{poolName}/runHealthChecks",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/projects/{projectName}/catalogs/{catalogName}/imageDefinitions/{imageDefinitionName}/buildImage",
                 **self.url_parameters
             )
 
@@ -122,7 +135,11 @@ class RunHealthCheck(AAZCommand):
         def url_parameters(self):
             parameters = {
                 **self.serialize_url_param(
-                    "poolName", self.ctx.args.pool_name,
+                    "catalogName", self.ctx.args.catalog_name,
+                    required=True,
+                ),
+                **self.serialize_url_param(
+                    "imageDefinitionName", self.ctx.args.image_definition_name,
                     required=True,
                 ),
                 **self.serialize_url_param(
@@ -151,8 +168,8 @@ class RunHealthCheck(AAZCommand):
             return parameters
 
 
-class _RunHealthCheckHelper:
-    """Helper class for RunHealthCheck"""
+class _BuildImageHelper:
+    """Helper class for BuildImage"""
 
 
-__all__ = ["RunHealthCheck"]
+__all__ = ["BuildImage"]

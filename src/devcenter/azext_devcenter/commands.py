@@ -88,7 +88,19 @@ from .custom import (
     ScheduleShow,
     ScheduleUpdate,
     ScheduleWait,
-)
+    ImageDefinitionBuildImage,
+    ImageDefinitionList,
+    ImageDefinitionShow,
+    ImageDefinitionBuildList,
+    ImageDefinitionBuildShow,
+    ImageDefinitionBuildCancel,
+    ImageDefinitionBuildGetBuildDetail,
+    ProjectImageList,
+    ProjectImageShow,
+    ProjectImageVersionList,
+    ProjectImageVersionShow,
+    ProjectSkuList
+    )
 
 
 def load_command_table(self, _):
@@ -283,6 +295,23 @@ def load_command_table(self, _):
     self.command_table["devcenter admin schedule show"] = ScheduleShow(loader=self)
     self.command_table["devcenter admin schedule update"] = ScheduleUpdate(loader=self)
     self.command_table["devcenter admin schedule wait"] = ScheduleWait(loader=self)
+
+    self.command_table["devcenter admin project-catalog image-definition build-image"] = ImageDefinitionBuildImage(loader=self)
+    self.command_table["devcenter admin project-catalog image-definition list"] = ImageDefinitionList(loader=self)
+    self.command_table["devcenter admin project-catalog image-definition show"] = ImageDefinitionShow(loader=self)
+
+    self.command_table["devcenter admin project-catalog image-definition-build list"] = ImageDefinitionBuildList(loader=self)
+    self.command_table["devcenter admin project-catalog image-definition-build show"] = ImageDefinitionBuildShow(loader=self)
+    self.command_table["devcenter admin project-catalog image-definition-build cancel"] = ImageDefinitionBuildCancel(loader=self)
+    self.command_table["devcenter admin project-catalog image-definition-build get-build-detail"] = ImageDefinitionBuildGetBuildDetail(loader=self)
+
+    self.command_table["devcenter admin project-image list"] = ProjectImageList(loader=self)
+    self.command_table["devcenter admin project-image show"] = ProjectImageShow(loader=self)
+
+    self.command_table["devcenter admin project-image-version list"] = ProjectImageVersionList(loader=self)
+    self.command_table["devcenter admin project-image-version show"] = ProjectImageVersionShow(loader=self)
+
+    self.command_table["devcenter admin project-sku list"] = ProjectSkuList(loader=self)
 
     # Data plane
 

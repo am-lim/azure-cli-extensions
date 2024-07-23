@@ -12,19 +12,20 @@ from azure.cli.core.aaz import *
 
 
 @register_command(
-    "devcenter admin pool show",
+    "devcenter admin project-image show",
+    is_preview=True,
 )
 class Show(AAZCommand):
-    """Get a pool.
+    """Get an image.
 
-    :example: Get
-        az admin pool show --name "DevPool" --project-name "DevProject" --resource-group "rg1"
+    :example: Show
+        az devcenter admin project-image show --project-name "DevProject" --resource-group "rg1" --image-name "~gallery~DefaultDevGallery~ContosoBaseImage"
     """
 
     _aaz_info = {
         "version": "2024-07-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}/pools/{}", "2024-07-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}/images/{}", "2024-07-01-preview"],
         ]
     }
 
@@ -44,14 +45,14 @@ class Show(AAZCommand):
         # define Arg Group ""
 
         _args_schema = cls._args_schema
-        _args_schema.pool_name = AAZStrArg(
-            options=["-n", "--name", "--pool-name"],
-            help="Name of the pool.",
+        _args_schema.image_name = AAZStrArg(
+            options=["-n", "--name", "--image-name"],
+            help="The name of the image.",
             required=True,
             id_part="child_name_1",
             fmt=AAZStrArgFormat(
-                pattern="^[a-zA-Z0-9][a-zA-Z0-9-_.]{2,62}$",
-                max_length=63,
+                pattern="^[a-zA-Z0-9~][a-zA-Z0-9-.~]{0,151}[a-zA-Z0-9]$",
+                max_length=153,
                 min_length=3,
             ),
         )
@@ -59,6 +60,7 @@ class Show(AAZCommand):
             options=["--project", "--project-name"],
             help="The name of the project. Use `az configure -d project=<project_name>` to configure a default.",
             required=True,
+            is_preview=True,
             id_part="name",
             fmt=AAZStrArgFormat(
                 pattern="^[a-zA-Z0-9][a-zA-Z0-9-_.]{2,62}$",
@@ -73,7 +75,7 @@ class Show(AAZCommand):
 
     def _execute_operations(self):
         self.pre_operations()
-        self.PoolsGet(ctx=self.ctx)()
+        self.ImagesGetByProject(ctx=self.ctx)()
         self.post_operations()
 
     @register_callback
@@ -88,7 +90,7 @@ class Show(AAZCommand):
         result = self.deserialize_output(self.ctx.vars.instance, client_flatten=True)
         return result
 
-    class PoolsGet(AAZHttpOperation):
+    class ImagesGetByProject(AAZHttpOperation):
         CLIENT_TYPE = "MgmtClient"
 
         def __call__(self, *args, **kwargs):
@@ -102,7 +104,7 @@ class Show(AAZCommand):
         @property
         def url(self):
             return self.client.format_url(
-                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/projects/{projectName}/pools/{poolName}",
+                "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DevCenter/projects/{projectName}/images/{imageName}",
                 **self.url_parameters
             )
 
@@ -118,7 +120,7 @@ class Show(AAZCommand):
         def url_parameters(self):
             parameters = {
                 **self.serialize_url_param(
-                    "poolName", self.ctx.args.pool_name,
+                    "imageName", self.ctx.args.image_name,
                     required=True,
                 ),
                 **self.serialize_url_param(
@@ -176,9 +178,6 @@ class Show(AAZCommand):
             _schema_on_200.id = AAZStrType(
                 flags={"read_only": True},
             )
-            _schema_on_200.location = AAZStrType(
-                flags={"required": True},
-            )
             _schema_on_200.name = AAZStrType(
                 flags={"read_only": True},
             )
@@ -189,104 +188,41 @@ class Show(AAZCommand):
                 serialized_name="systemData",
                 flags={"read_only": True},
             )
-            _schema_on_200.tags = AAZDictType()
             _schema_on_200.type = AAZStrType(
                 flags={"read_only": True},
             )
 
             properties = cls._schema_on_200.properties
-            properties.dev_box_count = AAZIntType(
-                serialized_name="devBoxCount",
+            properties.description = AAZStrType(
                 flags={"read_only": True},
             )
-            properties.dev_box_definition = AAZObjectType(
-                serialized_name="devBoxDefinition",
+            properties.hibernate_support = AAZStrType(
+                serialized_name="hibernateSupport",
             )
-            properties.dev_box_definition_name = AAZStrType(
-                serialized_name="devBoxDefinitionName",
-                flags={"required": True},
-            )
-            properties.dev_box_definition_type = AAZStrType(
-                serialized_name="devBoxDefinitionType",
-            )
-            properties.display_name = AAZStrType(
-                serialized_name="displayName",
-            )
-            properties.health_status = AAZStrType(
-                serialized_name="healthStatus",
-            )
-            properties.health_status_details = AAZListType(
-                serialized_name="healthStatusDetails",
+            properties.offer = AAZStrType(
                 flags={"read_only": True},
-            )
-            properties.license_type = AAZStrType(
-                serialized_name="licenseType",
-                flags={"required": True},
-            )
-            properties.local_administrator = AAZStrType(
-                serialized_name="localAdministrator",
-                flags={"required": True},
-            )
-            properties.managed_virtual_network_regions = AAZListType(
-                serialized_name="managedVirtualNetworkRegions",
-            )
-            properties.network_connection_name = AAZStrType(
-                serialized_name="networkConnectionName",
-                flags={"required": True},
             )
             properties.provisioning_state = AAZStrType(
                 serialized_name="provisioningState",
                 flags={"read_only": True},
             )
-            properties.single_sign_on_status = AAZStrType(
-                serialized_name="singleSignOnStatus",
-            )
-            properties.stop_on_disconnect = AAZObjectType(
-                serialized_name="stopOnDisconnect",
-            )
-            properties.virtual_network_type = AAZStrType(
-                serialized_name="virtualNetworkType",
-            )
-
-            dev_box_definition = cls._schema_on_200.properties.dev_box_definition
-            dev_box_definition.active_image_reference = AAZObjectType(
-                serialized_name="activeImageReference",
-            )
-            _ShowHelper._build_schema_image_reference_read(dev_box_definition.active_image_reference)
-            dev_box_definition.image_reference = AAZObjectType(
-                serialized_name="imageReference",
-            )
-            _ShowHelper._build_schema_image_reference_read(dev_box_definition.image_reference)
-            dev_box_definition.sku = AAZObjectType()
-
-            sku = cls._schema_on_200.properties.dev_box_definition.sku
-            sku.capacity = AAZIntType()
-            sku.family = AAZStrType()
-            sku.name = AAZStrType(
-                flags={"required": True},
-            )
-            sku.size = AAZStrType()
-            sku.tier = AAZStrType()
-
-            health_status_details = cls._schema_on_200.properties.health_status_details
-            health_status_details.Element = AAZObjectType()
-
-            _element = cls._schema_on_200.properties.health_status_details.Element
-            _element.code = AAZStrType(
+            properties.publisher = AAZStrType(
                 flags={"read_only": True},
             )
-            _element.message = AAZStrType(
+            properties.recommended_machine_configuration = AAZObjectType(
+                serialized_name="recommendedMachineConfiguration",
+            )
+            properties.sku = AAZStrType(
                 flags={"read_only": True},
             )
 
-            managed_virtual_network_regions = cls._schema_on_200.properties.managed_virtual_network_regions
-            managed_virtual_network_regions.Element = AAZStrType()
-
-            stop_on_disconnect = cls._schema_on_200.properties.stop_on_disconnect
-            stop_on_disconnect.grace_period_minutes = AAZIntType(
-                serialized_name="gracePeriodMinutes",
+            recommended_machine_configuration = cls._schema_on_200.properties.recommended_machine_configuration
+            recommended_machine_configuration.memory = AAZObjectType()
+            _ShowHelper._build_schema_resource_range_read(recommended_machine_configuration.memory)
+            recommended_machine_configuration.v_cp_us = AAZObjectType(
+                serialized_name="vCPUs",
             )
-            stop_on_disconnect.status = AAZStrType()
+            _ShowHelper._build_schema_resource_range_read(recommended_machine_configuration.v_cp_us)
 
             system_data = cls._schema_on_200.system_data
             system_data.created_at = AAZStrType(
@@ -308,35 +244,33 @@ class Show(AAZCommand):
                 serialized_name="lastModifiedByType",
             )
 
-            tags = cls._schema_on_200.tags
-            tags.Element = AAZStrType()
-
             return cls._schema_on_200
 
 
 class _ShowHelper:
     """Helper class for Show"""
 
-    _schema_image_reference_read = None
+    _schema_resource_range_read = None
 
     @classmethod
-    def _build_schema_image_reference_read(cls, _schema):
-        if cls._schema_image_reference_read is not None:
-            _schema.exact_version = cls._schema_image_reference_read.exact_version
-            _schema.id = cls._schema_image_reference_read.id
+    def _build_schema_resource_range_read(cls, _schema):
+        if cls._schema_resource_range_read is not None:
+            _schema.max = cls._schema_resource_range_read.max
+            _schema.min = cls._schema_resource_range_read.min
             return
 
-        cls._schema_image_reference_read = _schema_image_reference_read = AAZObjectType()
+        cls._schema_resource_range_read = _schema_resource_range_read = AAZObjectType()
 
-        image_reference_read = _schema_image_reference_read
-        image_reference_read.exact_version = AAZStrType(
-            serialized_name="exactVersion",
+        resource_range_read = _schema_resource_range_read
+        resource_range_read.max = AAZIntType(
             flags={"read_only": True},
         )
-        image_reference_read.id = AAZStrType()
+        resource_range_read.min = AAZIntType(
+            flags={"read_only": True},
+        )
 
-        _schema.exact_version = cls._schema_image_reference_read.exact_version
-        _schema.id = cls._schema_image_reference_read.id
+        _schema.max = cls._schema_resource_range_read.max
+        _schema.min = cls._schema_resource_range_read.min
 
 
 __all__ = ["Show"]

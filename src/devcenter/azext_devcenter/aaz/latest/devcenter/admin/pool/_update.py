@@ -22,9 +22,9 @@ class Update(AAZCommand):
     """
 
     _aaz_info = {
-        "version": "2024-05-01-preview",
+        "version": "2024-07-01-preview",
         "resources": [
-            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}/pools/{}", "2024-05-01-preview"],
+            ["mgmt-plane", "/subscriptions/{}/resourcegroups/{}/providers/microsoft.devcenter/projects/{}/pools/{}", "2024-07-01-preview"],
         ]
     }
 
@@ -91,10 +91,24 @@ class Update(AAZCommand):
         # define Arg Group "Properties"
 
         _args_schema = cls._args_schema
+        _args_schema.dev_box_definition = AAZObjectArg(
+            options=["--dev-box-definition"],
+            arg_group="Properties",
+            help="A definition of the machines that are created from this Pool. Will be ignored if devBoxDefinitionType is Reference or not provided.",
+            is_preview=True,
+            nullable=True,
+        )
         _args_schema.devbox_definition_name = AAZStrArg(
             options=["-d", "--devbox-definition-name"],
             arg_group="Properties",
             help="Name of a dev box definition in parent project of this pool.",
+        )
+        _args_schema.dev_box_definition_type = AAZStrArg(
+            options=["--dev-box-definition-type"],
+            arg_group="Properties",
+            help="Indicates if the pool is created from an existing Dev Box Definition or if one is provided directly.",
+            nullable=True,
+            enum={"Reference": "Reference", "Value": "Value"},
         )
         _args_schema.display_name = AAZStrArg(
             options=["--display-name"],
@@ -109,7 +123,7 @@ class Update(AAZCommand):
             enum={"Disabled": "Disabled", "Enabled": "Enabled"},
         )
         _args_schema.managed_virtual_network_regions = AAZListArg(
-            options=["--managed-virtual-network-regions", "-m"],
+            options=["--managed-virtual-network-regions"],
             arg_group="Properties",
             help="The regions of the managed virtual network (required when managedNetworkType is Managed).",
             nullable=True,
@@ -130,7 +144,6 @@ class Update(AAZCommand):
             options=["--stop-on-disconnect"],
             arg_group="Properties",
             help="Stop on disconnect configuration settings for dev boxes created in this pool.",
-            is_preview=True,
             nullable=True,
         )
         _args_schema.virtual_network_type = AAZStrArg(
@@ -139,6 +152,52 @@ class Update(AAZCommand):
             help="Indicates whether the pool uses a Virtual Network managed by Microsoft or a customer provided network.",
             nullable=True,
             enum={"Managed": "Managed", "Unmanaged": "Unmanaged"},
+        )
+
+        dev_box_definition = cls._args_schema.dev_box_definition
+        dev_box_definition.image_reference = AAZObjectArg(
+            options=["image-reference"],
+            help="Image reference information.",
+            nullable=True,
+        )
+        dev_box_definition.sku = AAZObjectArg(
+            options=["sku"],
+            help="The SKU for Dev Boxes created from the Pool.",
+            nullable=True,
+        )
+
+        image_reference = cls._args_schema.dev_box_definition.image_reference
+        image_reference.id = AAZStrArg(
+            options=["id"],
+            help="Image ID, or Image version ID. When Image ID is provided, its latest version will be used.",
+            nullable=True,
+        )
+
+        sku = cls._args_schema.dev_box_definition.sku
+        sku.capacity = AAZIntArg(
+            options=["capacity"],
+            help="If the SKU supports scale out/in then the capacity integer should be included. If scale out/in is not possible for the resource this may be omitted.",
+            nullable=True,
+        )
+        sku.family = AAZStrArg(
+            options=["family"],
+            help="If the service has different generations of hardware, for the same SKU, then that can be captured here.",
+            nullable=True,
+        )
+        sku.name = AAZStrArg(
+            options=["name"],
+            help="The name of the SKU. E.g. P3. It is typically a letter+number code",
+        )
+        sku.size = AAZStrArg(
+            options=["size"],
+            help="The SKU size. When the name field is the combination of tier and some other value, this would be the standalone code. ",
+            nullable=True,
+        )
+        sku.tier = AAZStrArg(
+            options=["tier"],
+            help="This field is required to be implemented by the Resource Provider if the service has more than one tier, but is not required on a PUT.",
+            nullable=True,
+            enum={"Basic": "Basic", "Free": "Free", "Premium": "Premium", "Standard": "Standard"},
         )
 
         managed_virtual_network_regions = cls._args_schema.managed_virtual_network_regions
@@ -242,7 +301,7 @@ class Update(AAZCommand):
         def query_parameters(self):
             parameters = {
                 **self.serialize_query_param(
-                    "api-version", "2024-05-01-preview",
+                    "api-version", "2024-07-01-preview",
                     required=True,
                 ),
             }
@@ -345,7 +404,7 @@ class Update(AAZCommand):
         def query_parameters(self):
             parameters = {
                 **self.serialize_query_param(
-                    "api-version", "2024-05-01-preview",
+                    "api-version", "2024-07-01-preview",
                     required=True,
                 ),
             }
@@ -408,7 +467,9 @@ class Update(AAZCommand):
 
             properties = _builder.get(".properties")
             if properties is not None:
+                properties.set_prop("devBoxDefinition", AAZObjectType, ".dev_box_definition")
                 properties.set_prop("devBoxDefinitionName", AAZStrType, ".devbox_definition_name", typ_kwargs={"flags": {"required": True}})
+                properties.set_prop("devBoxDefinitionType", AAZStrType, ".dev_box_definition_type")
                 properties.set_prop("displayName", AAZStrType, ".display_name")
                 properties.set_prop("localAdministrator", AAZStrType, ".local_administrator", typ_kwargs={"flags": {"required": True}})
                 properties.set_prop("managedVirtualNetworkRegions", AAZListType, ".managed_virtual_network_regions")
@@ -416,6 +477,23 @@ class Update(AAZCommand):
                 properties.set_prop("singleSignOnStatus", AAZStrType, ".single_sign_on_status")
                 properties.set_prop("stopOnDisconnect", AAZObjectType, ".stop_on_disconnect")
                 properties.set_prop("virtualNetworkType", AAZStrType, ".virtual_network_type")
+
+            dev_box_definition = _builder.get(".properties.devBoxDefinition")
+            if dev_box_definition is not None:
+                dev_box_definition.set_prop("imageReference", AAZObjectType, ".image_reference")
+                dev_box_definition.set_prop("sku", AAZObjectType, ".sku")
+
+            image_reference = _builder.get(".properties.devBoxDefinition.imageReference")
+            if image_reference is not None:
+                image_reference.set_prop("id", AAZStrType, ".id")
+
+            sku = _builder.get(".properties.devBoxDefinition.sku")
+            if sku is not None:
+                sku.set_prop("capacity", AAZIntType, ".capacity")
+                sku.set_prop("family", AAZStrType, ".family")
+                sku.set_prop("name", AAZStrType, ".name", typ_kwargs={"flags": {"required": True}})
+                sku.set_prop("size", AAZStrType, ".size")
+                sku.set_prop("tier", AAZStrType, ".tier")
 
             managed_virtual_network_regions = _builder.get(".properties.managedVirtualNetworkRegions")
             if managed_virtual_network_regions is not None:
@@ -443,6 +521,27 @@ class Update(AAZCommand):
 
 class _UpdateHelper:
     """Helper class for Update"""
+
+    _schema_image_reference_read = None
+
+    @classmethod
+    def _build_schema_image_reference_read(cls, _schema):
+        if cls._schema_image_reference_read is not None:
+            _schema.exact_version = cls._schema_image_reference_read.exact_version
+            _schema.id = cls._schema_image_reference_read.id
+            return
+
+        cls._schema_image_reference_read = _schema_image_reference_read = AAZObjectType()
+
+        image_reference_read = _schema_image_reference_read
+        image_reference_read.exact_version = AAZStrType(
+            serialized_name="exactVersion",
+            flags={"read_only": True},
+        )
+        image_reference_read.id = AAZStrType()
+
+        _schema.exact_version = cls._schema_image_reference_read.exact_version
+        _schema.id = cls._schema_image_reference_read.id
 
     _schema_pool_read = None
 
@@ -487,9 +586,15 @@ class _UpdateHelper:
             serialized_name="devBoxCount",
             flags={"read_only": True},
         )
+        properties.dev_box_definition = AAZObjectType(
+            serialized_name="devBoxDefinition",
+        )
         properties.dev_box_definition_name = AAZStrType(
             serialized_name="devBoxDefinitionName",
             flags={"required": True},
+        )
+        properties.dev_box_definition_type = AAZStrType(
+            serialized_name="devBoxDefinitionType",
         )
         properties.display_name = AAZStrType(
             serialized_name="displayName",
@@ -529,6 +634,26 @@ class _UpdateHelper:
         properties.virtual_network_type = AAZStrType(
             serialized_name="virtualNetworkType",
         )
+
+        dev_box_definition = _schema_pool_read.properties.dev_box_definition
+        dev_box_definition.active_image_reference = AAZObjectType(
+            serialized_name="activeImageReference",
+        )
+        cls._build_schema_image_reference_read(dev_box_definition.active_image_reference)
+        dev_box_definition.image_reference = AAZObjectType(
+            serialized_name="imageReference",
+        )
+        cls._build_schema_image_reference_read(dev_box_definition.image_reference)
+        dev_box_definition.sku = AAZObjectType()
+
+        sku = _schema_pool_read.properties.dev_box_definition.sku
+        sku.capacity = AAZIntType()
+        sku.family = AAZStrType()
+        sku.name = AAZStrType(
+            flags={"required": True},
+        )
+        sku.size = AAZStrType()
+        sku.tier = AAZStrType()
 
         health_status_details = _schema_pool_read.properties.health_status_details
         health_status_details.Element = AAZObjectType()
