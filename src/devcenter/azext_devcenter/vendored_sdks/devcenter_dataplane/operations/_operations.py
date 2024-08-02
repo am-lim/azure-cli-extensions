@@ -1173,7 +1173,7 @@ def build_dev_boxes_get_customization_task_log_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2024-08-15-privatepreview"))
-    accept = _headers.pop("Accept", "text/plain")
+    accept = _headers.pop("Accept", "text/plain, application/json")
 
     # Construct URL
     _url = "/projects/{projectName}/users/{userId}/devboxes/{devBoxName}/customizationGroups/{customizationGroupName}/logs/{customizationTaskId}"  # pylint: disable=line-too-long
@@ -1428,7 +1428,50 @@ def build_dev_boxes_list_dev_box_sessions_request(
     return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
 
 
-def build_dev_boxes_list_inactive_dev_boxes_by_user_request(
+def build_dev_boxes_list_high_usage_dev_boxes_by_user_request(
+    project_name: str, user_id: str, *, days: int, hours: int, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2024-08-15-privatepreview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/projects/{projectName}/users/{userId}/sessions/devboxes/highUsage"
+    path_format_arguments = {
+        "projectName": _SERIALIZER.url(
+            "project_name",
+            project_name,
+            "str",
+            max_length=63,
+            min_length=3,
+            pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-_.]{2,62}$",
+        ),
+        "userId": _SERIALIZER.url(
+            "user_id",
+            user_id,
+            "str",
+            max_length=36,
+            min_length=2,
+            pattern=r"^[a-zA-Z0-9]{8}-([a-zA-Z0-9]{4}-){3}[a-zA-Z0-9]{12}$|^me$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+    _params["days"] = _SERIALIZER.query("days", days, "int")
+    _params["hours"] = _SERIALIZER.query("hours", hours, "int")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_dev_boxes_lis_inactive_dev_boxes_by_user_request(
     project_name: str, user_id: str, *, days: int, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
@@ -2651,7 +2694,7 @@ def build_environments_get_logs_by_operation_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2024-08-15-privatepreview"))
-    accept = _headers.pop("Accept", "text/plain")
+    accept = _headers.pop("Accept", "text/plain, application/json")
 
     # Construct URL
     _url = "/projects/{projectName}/users/{userId}/environments/{environmentName}/operations/{operationId}/logs"
@@ -7472,21 +7515,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         response = pipeline_response.http_response
 
-        if response.status_code not in [200]:
+        if response.status_code not in [200, 200]:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
             raise HttpResponseError(response=response)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(str, deserialized), {})
+            return cls(pipeline_response, cast(str, deserialized), {})  # type: ignore
 
-        return cast(str, deserialized)
+        return cast(str, deserialized)  # type: ignore
 
     @distributed_trace
     def list_operations(
@@ -8130,11 +8180,10 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_inactive_dev_boxes_by_user(
-        self, endpoint: str, project_name: str, user_id: str, *, days: int, **kwargs: Any
+    def list_high_usage_dev_boxes_by_user(
+        self, endpoint: str, project_name: str, user_id: str, *, days: int, hours: int, **kwargs: Any
     ) -> Iterable[JSON]:
-        """Lists Dev Boxes in the project for a particular user that have not been connected to for a
-        given number of days.
+        """Lists high usage Dev Boxes in the project for a particular user.
 
         :param endpoint: The DevCenter-specific URI to operate on. Required.
         :type endpoint: str
@@ -8145,6 +8194,192 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         :type user_id: str
         :keyword days: The number of days before today to consider for the usage of a user's dev boxes.
          Required.
+        :paramtype days: int
+        :keyword hours: The threshold number of hours for a dev box's usage to be considered high. Dev
+         boxes that have have seen more than, or equal to, the indicated hours of usage over the given
+         number of days are included as high usage. Required.
+        :paramtype hours: int
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
+                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
+                      Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
+                    "actionState": "str",  # Optional. The current action state of the Dev Box.
+                      This is state is based on previous"naction performed by user.
+                    "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
+                      Box.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "hardwareProfile": {
+                        "memoryGB": 0,  # Optional. The amount of memory available for the
+                          Dev Box.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
+                        "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
+                          Box.
+                    },
+                    "hibernateSupport": "str",  # Optional. Indicates whether hibernate is
+                      enabled/disabled or unknown. Known values are: "Enabled", "Disabled", and
+                      "OsUnsupported".
+                    "imageReference": {
+                        "name": "str",  # Optional. The name of the image used.
+                        "operatingSystem": "str",  # Optional. The operating system of the
+                          image.
+                        "osBuildNumber": "str",  # Optional. The operating system build
+                          number of the image.
+                        "publishedDate": "2020-02-20 00:00:00",  # Optional. The datetime
+                          that the backing image version was published.
+                        "version": "str"  # Optional. The version of the image.
+                    },
+                    "localAdministrator": "str",  # Optional. Indicates whether the owner of the
+                      Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
+                    "location": "str",  # Optional. Azure region where this Dev Box is located.
+                      This will be the same region as the"nVirtual Network it is attached to.
+                    "osType": "str",  # Optional. The operating system type of this Dev Box.
+                      "Windows"
+                    "powerState": "str",  # Optional. The current power state of the Dev Box.
+                      Known values are: "Unknown", "Running", "Deallocated", "PoweredOff", and
+                      "Hibernated".
+                    "projectName": "str",  # Optional. Name of the project this Dev Box belongs
+                      to.
+                    "provisioningState": "str",  # Optional. The current provisioning state of
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
+                    "storageProfile": {
+                        "osDisk": {
+                            "diskSizeGB": 0  # Optional. The size of the OS Disk in
+                              gigabytes.
+                        }
+                    },
+                    "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
+                    "user": "str"  # Optional. The AAD object id of the user this Dev Box is
+                      assigned to.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_boxes_list_high_usage_dev_boxes_by_user_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    days=days,
+                    hours=hours,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, iter(list_of_elem)
+
+        def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return ItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_inactive_dev_boxes_by_user(
+        self, endpoint: str, project_name: str, user_id: str, *, days: int, **kwargs: Any
+    ) -> Iterable[JSON]:
+        """Lists inactive Dev Boxes in the project for a particular user.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :keyword days: The number of days for a dev box to be considered inactive. Dev boxes that
+         haven't been connected to in at least this many days are included as inactive. Required.
         :paramtype days: int
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.paging.ItemPaged[JSON]
@@ -8252,7 +8487,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         def prepare_request(next_link=None):
             if not next_link:
 
-                request = build_dev_boxes_list_inactive_dev_boxes_by_user_request(
+                request = build_dev_boxes_lis_inactive_dev_boxes_by_user_request(
                     project_name=project_name,
                     user_id=user_id,
                     days=days,
@@ -8315,8 +8550,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
     def list_low_usage_dev_boxes_by_user(
         self, endpoint: str, project_name: str, user_id: str, *, days: int, hours: int, **kwargs: Any
     ) -> Iterable[JSON]:
-        """Lists Dev Boxes in the project for a particular user that have seen less usage than a given
-        threshold (in hours) over a given number of days.
+        """Lists low usage Dev Boxes in the project for a particular user.
 
         :param endpoint: The DevCenter-specific URI to operate on. Required.
         :type endpoint: str
@@ -8328,8 +8562,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         :keyword days: The number of days before today to consider for the usage of a user's dev boxes.
          Required.
         :paramtype days: int
-        :keyword hours: The threshold usage in hours for dev boxes to be considered low usage.
-         Required.
+        :keyword hours: The threshold number of hours for a dev box's usage to be considered low. Dev
+         boxes that have have seen less than, or equal to, the indicated hours of usage over the given
+         number of days are included as low usage. Required.
         :paramtype hours: int
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.paging.ItemPaged[JSON]
@@ -12258,21 +12493,28 @@ class EnvironmentsOperations:
 
         response = pipeline_response.http_response
 
-        if response.status_code not in [200]:
+        if response.status_code not in [200, 200]:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
             raise HttpResponseError(response=response)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(str, deserialized), {})
+            return cls(pipeline_response, cast(str, deserialized), {})  # type: ignore
 
-        return cast(str, deserialized)
+        return cast(str, deserialized)  # type: ignore
 
     @distributed_trace
     def get_outputs(self, endpoint: str, project_name: str, user_id: str, environment_name: str, **kwargs: Any) -> JSON:
