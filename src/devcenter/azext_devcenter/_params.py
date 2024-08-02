@@ -595,6 +595,90 @@ def load_arguments(self, _):
             help="The id of the operation on a dev box.",
         )
 
+    with self.argument_context("devcenter dev dev-box list-sessions") as c:
+        c.argument(
+            "dev_center",
+            arg_type=dev_center_type,
+        )
+        c.argument(
+            "project_name",
+            arg_type=project_type,
+        )
+        c.argument(
+            "endpoint",
+            arg_type=endpoint,
+        )
+        c.argument(
+            "user_id",
+            type=str,
+            help="The AAD object id of the user. If value is 'me', the identity is taken from the "
+            "authentication context",
+        )
+        c.argument(
+            "dev_box_name",
+            options_list=["--name", "-n", "--dev-box-name"],
+            type=str,
+            help="The name of a dev " "box.",
+        )
+
+    with self.argument_context("devcenter dev dev-box list-inactive") as c:
+        c.argument(
+            "dev_center",
+            arg_type=dev_center_type,
+        )
+        c.argument(
+            "project_name",
+            arg_type=project_type,
+        )
+        c.argument(
+            "endpoint",
+            arg_type=endpoint,
+        )
+        c.argument(
+            "user_id",
+            type=str,
+            help="The AAD object id of the user. If value is 'me', the identity is taken from the "
+            "authentication context",
+        )
+        c.argument(
+            "days",
+            options_list=["--days"],
+            type=int,
+            help="The number of days for a dev box to be considered inactive. Dev boxes that haven't been connected to in at least this many days are included as inactive."
+        )
+
+    with self.argument_context("devcenter dev dev-box list-low-usage") as c:
+        c.argument(
+            "dev_center",
+            arg_type=dev_center_type,
+        )
+        c.argument(
+            "project_name",
+            arg_type=project_type,
+        )
+        c.argument(
+            "endpoint",
+            arg_type=endpoint,
+        )
+        c.argument(
+            "user_id",
+            type=str,
+            help="The AAD object id of the user. If value is 'me', the identity is taken from the "
+            "authentication context",
+        )
+        c.argument(
+            "days",
+            options_list=["--days"],
+            type=int,
+            help="The number of days for a dev box to be considered inactive. Dev boxes that haven't been connected to in at least this many days are included as inactive."
+        )
+        c.argument(
+            "hours",
+            options_list=["--hours"],
+            type=int,
+            help="The number of hours for a dev box's usage to be considered low. Dev boxes that have have seen less than, or equal to, the indicated hours of usage over the given number of days are included as low usage."
+        )
+
     with self.argument_context("devcenter dev environment list") as c:
         c.argument(
             "dev_center",

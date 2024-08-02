@@ -424,6 +424,54 @@ helps[
 """
 
 helps[
+    "devcenter dev dev-box list-sessions"
+] = """
+    type: command
+    short-summary: "List sessions for the given Dev Box."
+    examples:
+      - name: List sessions using dev center
+        text: |-
+               az devcenter dev dev-box list-sessions --name "MyDevBox" --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: List sessions using endpoint
+        text: |-
+               az devcenter dev dev-box list-sessions --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+helps[
+    "devcenter dev dev-box list-inactive"
+] = """
+    type: command
+    short-summary: "List Dev Boxes that have not been connected to in the given number of days, which are considered inactive."
+    examples:
+      - name: List inactive dev boxes using dev center
+        text: |-
+               az devcenter dev dev-box list-inactive --days 7 --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: List inactive dev boxes using endpoint
+        text: |-
+               az devcenter dev dev-box list-inactive --days 7 --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+helps[
+    "devcenter dev dev-box list-low-usage"
+] = """
+    type: command
+    short-summary: "List Dev Boxes that have seen less than the indicated hours of usage over the given number of days, which are considered low usage."
+    examples:
+      - name: List low usage dev boxes using dev center
+        text: |-
+               az devcenter dev dev-box list-low-usage --hours 20 --days 7 --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: List low usage dev boxes using endpoint
+        text: |-
+               az devcenter dev dev-box list-low-usage --hours 20 --days 7 --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+helps[
     "devcenter dev environment"
 ] = """
     type: group
