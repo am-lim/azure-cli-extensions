@@ -9,7 +9,7 @@
 import datetime
 from io import IOBase
 import sys
-from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, IO, List, Optional, TypeVar, Union, cast, overload
+from typing import Any, AsyncIterable, Callable, Dict, IO, Optional, TypeVar, Union, cast, overload
 import urllib.parse
 
 from azure.core.async_paging import AsyncItemPaged, AsyncList
@@ -48,6 +48,7 @@ from ...operations._operations import (
     build_dev_boxes_delete_dev_box_request,
     build_dev_boxes_get_action_request,
     build_dev_boxes_get_customization_group_request,
+    build_dev_boxes_get_customization_task_definitions_request,
     build_dev_boxes_get_customization_task_log_request,
     build_dev_boxes_get_dev_box_request,
     build_dev_boxes_get_operation_request,
@@ -58,7 +59,11 @@ from ...operations._operations import (
     build_dev_boxes_list_all_dev_boxes_by_user_request,
     build_dev_boxes_list_all_dev_boxes_request,
     build_dev_boxes_list_customization_groups_request,
+    build_dev_boxes_list_customization_task_definitions_by_project_request,
+    build_dev_boxes_list_dev_box_sessions_request,
     build_dev_boxes_list_dev_boxes_request,
+    build_dev_boxes_list_inactive_dev_boxes_by_user_request,
+    build_dev_boxes_list_low_usage_dev_boxes_by_user_request,
     build_dev_boxes_list_operations_request,
     build_dev_boxes_list_pools_request,
     build_dev_boxes_list_schedules_by_project_request,
@@ -68,23 +73,27 @@ from ...operations._operations import (
     build_dev_boxes_skip_action_request,
     build_dev_boxes_start_dev_box_request,
     build_dev_boxes_stop_dev_box_request,
+    build_dev_boxes_validate_customization_tasks_action_request,
+    build_dev_center_create_notification_settings_request,
+    build_dev_center_get_notification_settings_request,
     build_dev_center_get_project_abilities_request,
     build_dev_center_get_project_request,
+    build_dev_center_list_notification_settings_allowed_cultures_request,
     build_dev_center_list_projects_request,
     build_environments_delay_action_request,
     build_environments_get_action_request,
     build_environments_get_environment_type_abilities_request,
-    build_environments_get_environment_type_request,
+    build_environments_get_environment_types_request,
     build_environments_get_logs_by_operation_request,
     build_environments_get_operation_request,
     build_environments_get_outputs_request,
     build_environments_list_actions_request,
+    build_environments_list_artifacts_by_environment_and_path_request,
+    build_environments_list_artifacts_by_environment_request,
     build_environments_list_operations_request,
     build_environments_patch_environment_request,
     build_environments_skip_action_request,
-    build_projects_get_customization_task_definition_request,
-    build_projects_list_customization_task_definitions_request,
-    build_projects_validate_customization_tasks_request,
+    build_operation_statuses_get_request,
 )
 
 if sys.version_info >= (3, 9):
@@ -96,14 +105,14 @@ T = TypeVar("T")
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, AsyncHttpResponse], T, Dict[str, Any]], Any]]
 
 
-class DevCenterOperations:
+class DevBoxesOperations:  # pylint: disable=too-many-public-methods
     """
     .. warning::
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
         :class:`~azure.developer.devcenter.aio.DevCenterClient`'s
-        :attr:`dev_center` attribute.
+        :attr:`dev_boxes` attribute.
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -114,16 +123,11 @@ class DevCenterOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list_projects(
-        self, *, filter: Optional[str] = None, top: Optional[int] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists all projects.
+    def list_all_dev_boxes(self, endpoint: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists Dev Boxes that the caller has access to in the DevCenter.
 
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -133,12 +137,85 @@ class DevCenterOperations:
 
                 # response body for status code(s): 200
                 response == {
-                    "name": "str",  # Name of the project. Required.
-                    "uri": "str",  # The unique URI of the project. Required.
-                    "description": "str",  # Optional. Description of the project.
-                    "displayName": "str",  # Optional. Display name of the project.
-                    "maxDevBoxesPerUser": 0  # Optional. When specified, indicates the maximum
-                      number of Dev Boxes a single user can create across all pools in the project.
+                    "name": "str",  # Display name for the Dev Box. Required.
+                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
+                      Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
+                    "actionState": "str",  # Optional. The current action state of the Dev Box.
+                      This is state is based on previous"naction performed by user.
+                    "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
+                      Box.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "hardwareProfile": {
+                        "memoryGB": 0,  # Optional. The amount of memory available for the
+                          Dev Box.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
+                        "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
+                          Box.
+                    },
+                    "hibernateSupport": "str",  # Optional. Indicates whether hibernate is
+                      enabled/disabled or unknown. Known values are: "Enabled", "Disabled", and
+                      "OsUnsupported".
+                    "imageReference": {
+                        "name": "str",  # Optional. The name of the image used.
+                        "operatingSystem": "str",  # Optional. The operating system of the
+                          image.
+                        "osBuildNumber": "str",  # Optional. The operating system build
+                          number of the image.
+                        "publishedDate": "2020-02-20 00:00:00",  # Optional. The datetime
+                          that the backing image version was published.
+                        "version": "str"  # Optional. The version of the image.
+                    },
+                    "localAdministrator": "str",  # Optional. Indicates whether the owner of the
+                      Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
+                    "location": "str",  # Optional. Azure region where this Dev Box is located.
+                      This will be the same region as the"nVirtual Network it is attached to.
+                    "osType": "str",  # Optional. The operating system type of this Dev Box.
+                      "Windows"
+                    "powerState": "str",  # Optional. The current power state of the Dev Box.
+                      Known values are: "Unknown", "Running", "Deallocated", "PoweredOff", and
+                      "Hibernated".
+                    "projectName": "str",  # Optional. Name of the project this Dev Box belongs
+                      to.
+                    "provisioningState": "str",  # Optional. The current provisioning state of
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
+                    "storageProfile": {
+                        "osDisk": {
+                            "diskSizeGB": 0  # Optional. The size of the OS Disk in
+                              gigabytes.
+                        }
+                    },
+                    "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
+                    "user": "str"  # Optional. The AAD object id of the user this Dev Box is
+                      assigned to.
                 }
         """
         _headers = kwargs.pop("headers", {}) or {}
@@ -157,17 +234,13 @@ class DevCenterOperations:
         def prepare_request(next_link=None):
             if not next_link:
 
-                request = build_dev_center_list_projects_request(
-                    filter=filter,
-                    top=top,
+                request = build_dev_boxes_list_all_dev_boxes_request(
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -185,9 +258,7 @@ class DevCenterOperations:
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -220,11 +291,19 @@ class DevCenterOperations:
         return AsyncItemPaged(get_next, extract_data)
 
     @distributed_trace_async
-    async def get_project(self, project_name: str, **kwargs: Any) -> JSON:
-        """Gets a project.
+    async def get_customization_task_definitions(
+        self, endpoint: str, project_name: str, catalog_name: str, task_name: str, **kwargs: Any
+    ) -> JSON:
+        """Gets a customization task.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
+        :param catalog_name: Name of the catalog. Required.
+        :type catalog_name: str
+        :param task_name: Full name of the task: {catalogName}/{taskName}. Required.
+        :type task_name: str
         :return: JSON object
         :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -234,12 +313,26 @@ class DevCenterOperations:
 
                 # response body for status code(s): 200
                 response == {
-                    "name": "str",  # Name of the project. Required.
-                    "uri": "str",  # The unique URI of the project. Required.
-                    "description": "str",  # Optional. Description of the project.
-                    "displayName": "str",  # Optional. Display name of the project.
-                    "maxDevBoxesPerUser": 0  # Optional. When specified, indicates the maximum
-                      number of Dev Boxes a single user can create across all pools in the project.
+                    "catalogName": "str",  # Name of the catalog that the task belongs to.
+                      Required.
+                    "name": "str",  # Full name of the task: {catalogName}/{taskName}. Required.
+                    "description": "str",  # Optional. Description of the task.
+                    "parameters": {
+                        "str": {
+                            "type": "str",  # Type of the parameter. Required. Known
+                              values are: "string", "number", and "boolean".
+                            "allowed": [
+                                "str"  # Optional. Allowed values for the parameter.
+                            ],
+                            "default": "str",  # Optional. Default value for the
+                              parameter.
+                            "description": "str",  # Optional. Description of the
+                              parameter.
+                            "required": bool  # Optional. Whether or not the parameter is
+                              required.
+                        }
+                    },
+                    "uri": "str"  # Optional. The unique URI of the customization task.
                 }
         """
         error_map = {
@@ -255,14 +348,16 @@ class DevCenterOperations:
 
         cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        request = build_dev_center_get_project_request(
+        request = build_dev_boxes_get_customization_task_definitions_request(
             project_name=project_name,
+            catalog_name=catalog_name,
+            task_name=task_name,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -288,114 +383,650 @@ class DevCenterOperations:
             return cls(pipeline_response, cast(JSON, deserialized), {})
 
         return cast(JSON, deserialized)
-
-    @distributed_trace_async
-    async def get_project_abilities(self, project_name: str, user_id: str = "me", **kwargs: Any) -> JSON:
-        """Gets the signed-in user's permitted abilities in a project.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "abilitiesAsAdmin": [
-                        "str"  # The abilities the user has to perform actions on the project
-                          as an admin. Required.
-                    ],
-                    "abilitiesAsDeveloper": [
-                        "str"  # The abilities the user has to perform actions on the project
-                          as a developer. Required.
-                    ]
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_dev_center_get_project_abilities_request(
-            project_name=project_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-
-class DevBoxesOperations:  # pylint: disable=too-many-public-methods
-    """
-    .. warning::
-        **DO NOT** instantiate this class directly.
-
-        Instead, you should access the following operations through
-        :class:`~azure.developer.devcenter.aio.DevCenterClient`'s
-        :attr:`dev_boxes` attribute.
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        input_args = list(args)
-        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
-        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
-        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
-        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list_pools(
-        self, project_name: str, *, top: Optional[int] = None, filter: Optional[str] = None, **kwargs: Any
+    def list_customization_task_definitions_by_project(
+        self, endpoint: str, project_name: str, **kwargs: Any
     ) -> AsyncIterable[JSON]:
-        """Lists available pools.
+        """Lists all customization tasks available to the project.
 
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "catalogName": "str",  # Name of the catalog that the task belongs to.
+                      Required.
+                    "name": "str",  # Full name of the task: {catalogName}/{taskName}. Required.
+                    "description": "str",  # Optional. Description of the task.
+                    "parameters": {
+                        "str": {
+                            "type": "str",  # Type of the parameter. Required. Known
+                              values are: "string", "number", and "boolean".
+                            "allowed": [
+                                "str"  # Optional. Allowed values for the parameter.
+                            ],
+                            "default": "str",  # Optional. Default value for the
+                              parameter.
+                            "description": "str",  # Optional. Description of the
+                              parameter.
+                            "required": bool  # Optional. Whether or not the parameter is
+                              required.
+                        }
+                    },
+                    "uri": "str"  # Optional. The unique URI of the customization task.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_boxes_list_customization_task_definitions_by_project_request(
+                    project_name=project_name,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    async def _validate_customization_tasks_action_initial(
+        self, endpoint: str, project_name: str, body: Union[JSON, IO], **kwargs: Any
+    ) -> JSON:
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
+
+        request = build_dev_boxes_validate_customization_tasks_action_request(
+            project_name=project_name,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [202]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        response_headers = {}
+        response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+        response_headers["Operation-Location"] = self._deserialize("str", response.headers.get("Operation-Location"))
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), response_headers)
+
+        return cast(JSON, deserialized)
+
+    @overload
+    async def begin_validate_customization_tasks_action(
+        self, endpoint: str, project_name: str, body: JSON, *, content_type: str = "application/json", **kwargs: Any
+    ) -> AsyncLROPoller[JSON]:
+        """Validates a list of customization tasks.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param body: Customization tasks to validate. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
+        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
+         for this operation to not poll, or pass in your own initialized polling object for a personal
+         polling strategy.
+        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
+        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
+         Retry-After header is present.
+        :return: An instance of AsyncLROPoller that returns JSON object
+        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ]
+                }
+
+                # response body for status code(s): 202
+                response == {
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
+                      complete.
+                    "properties": {},  # Optional. Custom operation properties, populated only
+                      for a successful operation.
+                    "resourceId": "str",  # Optional. The id of the resource.
+                    "result": {
+                        "validationResult": "str",  # Outcome of validation. Required. Known
+                          values are: "Succeeded" and "Failed".
+                        "errors": [
+                            {
+                                "details": [
+                                    {
+                                        "code": "str",  # One of a
+                                          server-defined set of error codes. Required.
+                                        "message": "str",  # A human-readable
+                                          representation of the error. Required.
+                                        "details": [
+                                            ...
+                                        ],
+                                        "innererror": {
+                                            "code": "str",  # Optional.
+                                              One of a server-defined set of error codes.
+                                            "innererror": ...
+                                        },
+                                        "target": "str"  # Optional. The
+                                          target of the error.
+                                    }
+                                ],
+                                "target": {
+                                    "name": "str",  # Name of the task. Required.
+                                    "displayName": "str",  # Optional. Display
+                                      name to help differentiate multiple instances of the same task.
+                                    "endTime": "2020-02-20 00:00:00",  #
+                                      Optional. End time of the task.
+                                    "id": "str",  # Optional. ID of the task
+                                      instance.
+                                    "logUri": "str",  # Optional. The unique URI
+                                      for retrieving the task logs.
+                                    "parameters": {
+                                        "str": "str"  # Optional. Parameters
+                                          for the task.
+                                    },
+                                    "runAs": "str",  # Optional. What account to
+                                      run the task as. Known values are: "System" and "User".
+                                    "startTime": "2020-02-20 00:00:00",  #
+                                      Optional. Start time of the task.
+                                    "status": "str",  # Optional. Status of the
+                                      task. Known values are: "NotStarted", "Running", "Succeeded",
+                                      "FailedValidation", "Skipped", "TimedOut", "Failed",
+                                      "WaitingForUserInputUac", and "WaitingForUserSession".
+                                    "timeoutInSeconds": 0  # Optional. Timeout,
+                                      in seconds. Overrides any timeout provided on the task
+                                      definition.
+                                }
+                            }
+                        ]
+                    },
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
+                      operation.
+                }
+        """
+
+    @overload
+    async def begin_validate_customization_tasks_action(
+        self, endpoint: str, project_name: str, body: IO, *, content_type: str = "application/json", **kwargs: Any
+    ) -> AsyncLROPoller[JSON]:
+        """Validates a list of customization tasks.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param body: Customization tasks to validate. Required.
+        :type body: IO
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
+        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
+         for this operation to not poll, or pass in your own initialized polling object for a personal
+         polling strategy.
+        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
+        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
+         Retry-After header is present.
+        :return: An instance of AsyncLROPoller that returns JSON object
+        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 202
+                response == {
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
+                      complete.
+                    "properties": {},  # Optional. Custom operation properties, populated only
+                      for a successful operation.
+                    "resourceId": "str",  # Optional. The id of the resource.
+                    "result": {
+                        "validationResult": "str",  # Outcome of validation. Required. Known
+                          values are: "Succeeded" and "Failed".
+                        "errors": [
+                            {
+                                "details": [
+                                    {
+                                        "code": "str",  # One of a
+                                          server-defined set of error codes. Required.
+                                        "message": "str",  # A human-readable
+                                          representation of the error. Required.
+                                        "details": [
+                                            ...
+                                        ],
+                                        "innererror": {
+                                            "code": "str",  # Optional.
+                                              One of a server-defined set of error codes.
+                                            "innererror": ...
+                                        },
+                                        "target": "str"  # Optional. The
+                                          target of the error.
+                                    }
+                                ],
+                                "target": {
+                                    "name": "str",  # Name of the task. Required.
+                                    "displayName": "str",  # Optional. Display
+                                      name to help differentiate multiple instances of the same task.
+                                    "endTime": "2020-02-20 00:00:00",  #
+                                      Optional. End time of the task.
+                                    "id": "str",  # Optional. ID of the task
+                                      instance.
+                                    "logUri": "str",  # Optional. The unique URI
+                                      for retrieving the task logs.
+                                    "parameters": {
+                                        "str": "str"  # Optional. Parameters
+                                          for the task.
+                                    },
+                                    "runAs": "str",  # Optional. What account to
+                                      run the task as. Known values are: "System" and "User".
+                                    "startTime": "2020-02-20 00:00:00",  #
+                                      Optional. Start time of the task.
+                                    "status": "str",  # Optional. Status of the
+                                      task. Known values are: "NotStarted", "Running", "Succeeded",
+                                      "FailedValidation", "Skipped", "TimedOut", "Failed",
+                                      "WaitingForUserInputUac", and "WaitingForUserSession".
+                                    "timeoutInSeconds": 0  # Optional. Timeout,
+                                      in seconds. Overrides any timeout provided on the task
+                                      definition.
+                                }
+                            }
+                        ]
+                    },
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
+                      operation.
+                }
+        """
+
+    @distributed_trace_async
+    async def begin_validate_customization_tasks_action(
+        self, endpoint: str, project_name: str, body: Union[JSON, IO], **kwargs: Any
+    ) -> AsyncLROPoller[JSON]:
+        """Validates a list of customization tasks.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param body: Customization tasks to validate. Is either a JSON type or a IO type. Required.
+        :type body: JSON or IO
+        :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
          Default value is None.
-        :paramtype top: int
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
+        :paramtype content_type: str
+        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
+        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
+         for this operation to not poll, or pass in your own initialized polling object for a personal
+         polling strategy.
+        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
+        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
+         Retry-After header is present.
+        :return: An instance of AsyncLROPoller that returns JSON object
+        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ]
+                }
+
+                # response body for status code(s): 202
+                response == {
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
+                      complete.
+                    "properties": {},  # Optional. Custom operation properties, populated only
+                      for a successful operation.
+                    "resourceId": "str",  # Optional. The id of the resource.
+                    "result": {
+                        "validationResult": "str",  # Outcome of validation. Required. Known
+                          values are: "Succeeded" and "Failed".
+                        "errors": [
+                            {
+                                "details": [
+                                    {
+                                        "code": "str",  # One of a
+                                          server-defined set of error codes. Required.
+                                        "message": "str",  # A human-readable
+                                          representation of the error. Required.
+                                        "details": [
+                                            ...
+                                        ],
+                                        "innererror": {
+                                            "code": "str",  # Optional.
+                                              One of a server-defined set of error codes.
+                                            "innererror": ...
+                                        },
+                                        "target": "str"  # Optional. The
+                                          target of the error.
+                                    }
+                                ],
+                                "target": {
+                                    "name": "str",  # Name of the task. Required.
+                                    "displayName": "str",  # Optional. Display
+                                      name to help differentiate multiple instances of the same task.
+                                    "endTime": "2020-02-20 00:00:00",  #
+                                      Optional. End time of the task.
+                                    "id": "str",  # Optional. ID of the task
+                                      instance.
+                                    "logUri": "str",  # Optional. The unique URI
+                                      for retrieving the task logs.
+                                    "parameters": {
+                                        "str": "str"  # Optional. Parameters
+                                          for the task.
+                                    },
+                                    "runAs": "str",  # Optional. What account to
+                                      run the task as. Known values are: "System" and "User".
+                                    "startTime": "2020-02-20 00:00:00",  #
+                                      Optional. Start time of the task.
+                                    "status": "str",  # Optional. Status of the
+                                      task. Known values are: "NotStarted", "Running", "Succeeded",
+                                      "FailedValidation", "Skipped", "TimedOut", "Failed",
+                                      "WaitingForUserInputUac", and "WaitingForUserSession".
+                                    "timeoutInSeconds": 0  # Optional. Timeout,
+                                      in seconds. Overrides any timeout provided on the task
+                                      definition.
+                                }
+                            }
+                        ]
+                    },
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
+                      operation.
+                }
+        """
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        polling: Union[bool, AsyncPollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = await self._validate_customization_tasks_action_initial(
+                endpoint=endpoint,
+                project_name=project_name,
+                body=body,
+                content_type=content_type,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):
+            response_headers = {}
+            response = pipeline_response.http_response
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Operation-Location"] = self._deserialize(
+                "str", response.headers.get("Operation-Location")
+            )
+
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+            if cls:
+                return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return deserialized
+
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+
+        if polling is True:
+            polling_method: AsyncPollingMethod = cast(
+                AsyncPollingMethod,
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
+            )
+        elif polling is False:
+            polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return AsyncLROPoller.from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    @distributed_trace
+    def list_pools(self, endpoint: str, project_name: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists available pools.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -406,7 +1037,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                 # response body for status code(s): 200
                 response == {
                     "healthStatus": "str",  # Overall health status of the Pool. Indicates
-                      whether or not the Pool is available to create Dev Boxes. Required. Known values
+                      whether or not the Pool is"navailable to create Dev Boxes. Required. Known values
                       are: "Unknown", "Pending", "Healthy", "Warning", and "Unhealthy".
                     "location": "str",  # Azure region where Dev Boxes in the pool are located.
                       Required.
@@ -416,7 +1047,18 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -434,16 +1076,16 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         "version": "str"  # Optional. The version of the image.
                     },
                     "localAdministrator": "str",  # Optional. Indicates whether owners of Dev
-                      Boxes in this pool are local administrators on the Dev Boxes. Known values are:
+                      Boxes in this pool are local administrators on"nthe Dev Boxes. Known values are:
                       "Enabled" and "Disabled".
                     "osType": "str",  # Optional. The operating system type of Dev Boxes in this
                       pool. "Windows"
                     "stopOnDisconnect": {
                         "status": "str",  # Indicates whether the feature to stop the devbox
-                          on disconnect once the grace period has lapsed is enabled. Required. Known
+                          on disconnect once the grace"nperiod has lapsed is enabled. Required. Known
                           values are: "Enabled" and "Disabled".
                         "gracePeriodMinutes": 0  # Optional. The specified time in minutes to
-                          wait before stopping a Dev Box once disconnect is detected.
+                          wait before stopping a Dev Box once disconnect"nis detected.
                     },
                     "storageProfile": {
                         "osDisk": {
@@ -471,16 +1113,12 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 request = build_dev_boxes_list_pools_request(
                     project_name=project_name,
-                    top=top,
-                    filter=filter,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -498,9 +1136,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -533,12 +1169,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncItemPaged(get_next, extract_data)
 
     @distributed_trace_async
-    async def get_pool(self, project_name: str, pool_name: str, **kwargs: Any) -> JSON:
+    async def get_pool(self, endpoint: str, project_name: str, pool_name: str, **kwargs: Any) -> JSON:
         """Gets a pool.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param pool_name: The name of a pool of Dev Boxes. Required.
+        :param pool_name: Pool name. Required.
         :type pool_name: str
         :return: JSON object
         :rtype: JSON
@@ -550,7 +1188,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                 # response body for status code(s): 200
                 response == {
                     "healthStatus": "str",  # Overall health status of the Pool. Indicates
-                      whether or not the Pool is available to create Dev Boxes. Required. Known values
+                      whether or not the Pool is"navailable to create Dev Boxes. Required. Known values
                       are: "Unknown", "Pending", "Healthy", "Warning", and "Unhealthy".
                     "location": "str",  # Azure region where Dev Boxes in the pool are located.
                       Required.
@@ -560,7 +1198,18 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -578,16 +1227,16 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         "version": "str"  # Optional. The version of the image.
                     },
                     "localAdministrator": "str",  # Optional. Indicates whether owners of Dev
-                      Boxes in this pool are local administrators on the Dev Boxes. Known values are:
+                      Boxes in this pool are local administrators on"nthe Dev Boxes. Known values are:
                       "Enabled" and "Disabled".
                     "osType": "str",  # Optional. The operating system type of Dev Boxes in this
                       pool. "Windows"
                     "stopOnDisconnect": {
                         "status": "str",  # Indicates whether the feature to stop the devbox
-                          on disconnect once the grace period has lapsed is enabled. Required. Known
+                          on disconnect once the grace"nperiod has lapsed is enabled. Required. Known
                           values are: "Enabled" and "Disabled".
                         "gracePeriodMinutes": 0  # Optional. The specified time in minutes to
-                          wait before stopping a Dev Box once disconnect is detected.
+                          wait before stopping a Dev Box once disconnect"nis detected.
                     },
                     "storageProfile": {
                         "osDisk": {
@@ -618,7 +1267,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -646,143 +1295,15 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return cast(JSON, deserialized)
 
     @distributed_trace
-    def list_schedules_by_project(
-        self, project_name: str, *, top: Optional[int] = None, filter: Optional[str] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists all schedules within a project that are configured by your project administrator.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "frequency": "str",  # The frequency of this scheduled task. Required.
-                      "Daily"
-                    "name": "str",  # Display name for the Schedule. Required.
-                    "sourceType": "str",  # The type of the resource that this schedule belongs
-                      to. Required. "Pool"
-                    "sourceUri": "str",  # The URI of the resource that this schedule belongs to.
-                      Required.
-                    "time": "str",  # The target time to trigger the action. The format is HH:MM.
-                      Required.
-                    "timeZone": "str",  # The IANA timezone id at which the schedule should
-                      execute. Required.
-                    "type": "str",  # Supported type this scheduled task represents. Required.
-                      "StopDevBox"
-                    "uri": "str"  # The unique URI of the schedule. Required.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_dev_boxes_list_schedules_by_project_request(
-                    project_name=project_name,
-                    top=top,
-                    filter=filter,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace
-    def list_schedules(
-        self,
-        project_name: str,
-        pool_name: str,
-        *,
-        top: Optional[int] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any
-    ) -> AsyncIterable[JSON]:
+    def list_schedules(self, endpoint: str, project_name: str, pool_name: str, **kwargs: Any) -> AsyncIterable[JSON]:
         """Lists all schedules within a pool that are configured by your project administrator.
 
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
         :param pool_name: The name of a pool of Dev Boxes. Required.
         :type pool_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -827,16 +1348,12 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                 request = build_dev_boxes_list_schedules_request(
                     project_name=project_name,
                     pool_name=pool_name,
-                    top=top,
-                    filter=filter,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -854,9 +1371,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -889,14 +1404,18 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncItemPaged(get_next, extract_data)
 
     @distributed_trace_async
-    async def get_schedule(self, project_name: str, pool_name: str, schedule_name: str, **kwargs: Any) -> JSON:
+    async def get_schedule(
+        self, endpoint: str, project_name: str, pool_name: str, schedule_name: str, **kwargs: Any
+    ) -> JSON:
         """Gets a schedule.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param pool_name: The name of a pool of Dev Boxes. Required.
+        :param pool_name: Pool name. Required.
         :type pool_name: str
-        :param schedule_name: The name of a schedule. Required.
+        :param schedule_name: Display name for the Schedule. Required.
         :type schedule_name: str
         :return: JSON object
         :rtype: JSON
@@ -945,7 +1464,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -973,16 +1492,13 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return cast(JSON, deserialized)
 
     @distributed_trace
-    def list_all_dev_boxes(
-        self, *, filter: Optional[str] = None, top: Optional[int] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists Dev Boxes that the caller has access to in the DevCenter.
+    def list_schedules_by_project(self, endpoint: str, project_name: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists all schedules within a project that are configured by your project administrator.
 
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -992,68 +1508,20 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 200
                 response == {
-                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
+                    "frequency": "str",  # The frequency of this scheduled task. Required.
+                      "Daily"
+                    "name": "str",  # Display name for the Schedule. Required.
+                    "sourceType": "str",  # The type of the resource that this schedule belongs
+                      to. Required. "Pool"
+                    "sourceUri": "str",  # The URI of the resource that this schedule belongs to.
                       Required.
-                    "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
-                    "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
-                      Box.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "hardwareProfile": {
-                        "memoryGB": 0,  # Optional. The amount of memory available for the
-                          Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
-                        "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
-                          Box.
-                    },
-                    "hibernateSupport": "str",  # Optional. Indicates whether hibernate is
-                      enabled/disabled or unknown. Known values are: "Enabled", "Disabled", and
-                      "OsUnsupported".
-                    "imageReference": {
-                        "name": "str",  # Optional. The name of the image used.
-                        "operatingSystem": "str",  # Optional. The operating system of the
-                          image.
-                        "osBuildNumber": "str",  # Optional. The operating system build
-                          number of the image.
-                        "publishedDate": "2020-02-20 00:00:00",  # Optional. The datetime
-                          that the backing image version was published.
-                        "version": "str"  # Optional. The version of the image.
-                    },
-                    "localAdministrator": "str",  # Optional. Indicates whether the owner of the
-                      Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
-                    "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
-                    "osType": "str",  # Optional. The operating system type of this Dev Box.
-                      "Windows"
-                    "powerState": "str",  # Optional. The current power state of the Dev Box.
-                      Known values are: "Unknown", "Running", "Deallocated", "PoweredOff", and
-                      "Hibernated".
-                    "projectName": "str",  # Optional. Name of the project this Dev Box belongs
-                      to.
-                    "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
-                    "storageProfile": {
-                        "osDisk": {
-                            "diskSizeGB": 0  # Optional. The size of the OS Disk in
-                              gigabytes.
-                        }
-                    },
-                    "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
-                    "user": "str"  # Optional. The AAD object id of the user this Dev Box is
-                      assigned to.
+                    "time": "str",  # The target time to trigger the action. The format is HH:MM.
+                      Required.
+                    "timeZone": "str",  # The IANA timezone id at which the schedule should
+                      execute. Required.
+                    "type": "str",  # Supported type this scheduled task represents. Required.
+                      "StopDevBox"
+                    "uri": "str"  # The unique URI of the schedule. Required.
                 }
         """
         _headers = kwargs.pop("headers", {}) or {}
@@ -1072,17 +1540,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         def prepare_request(next_link=None):
             if not next_link:
 
-                request = build_dev_boxes_list_all_dev_boxes_request(
-                    filter=filter,
-                    top=top,
+                request = build_dev_boxes_list_schedules_by_project_request(
+                    project_name=project_name,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -1100,9 +1565,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -1135,193 +1598,16 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_all_dev_boxes_by_user(
-        self, user_id: str = "me", *, filter: Optional[str] = None, top: Optional[int] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists Dev Boxes in the Dev Center for a particular user.
-
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
-                      Required.
-                    "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
-                    "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
-                      Box.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "hardwareProfile": {
-                        "memoryGB": 0,  # Optional. The amount of memory available for the
-                          Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
-                        "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
-                          Box.
-                    },
-                    "hibernateSupport": "str",  # Optional. Indicates whether hibernate is
-                      enabled/disabled or unknown. Known values are: "Enabled", "Disabled", and
-                      "OsUnsupported".
-                    "imageReference": {
-                        "name": "str",  # Optional. The name of the image used.
-                        "operatingSystem": "str",  # Optional. The operating system of the
-                          image.
-                        "osBuildNumber": "str",  # Optional. The operating system build
-                          number of the image.
-                        "publishedDate": "2020-02-20 00:00:00",  # Optional. The datetime
-                          that the backing image version was published.
-                        "version": "str"  # Optional. The version of the image.
-                    },
-                    "localAdministrator": "str",  # Optional. Indicates whether the owner of the
-                      Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
-                    "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
-                    "osType": "str",  # Optional. The operating system type of this Dev Box.
-                      "Windows"
-                    "powerState": "str",  # Optional. The current power state of the Dev Box.
-                      Known values are: "Unknown", "Running", "Deallocated", "PoweredOff", and
-                      "Hibernated".
-                    "projectName": "str",  # Optional. Name of the project this Dev Box belongs
-                      to.
-                    "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
-                    "storageProfile": {
-                        "osDisk": {
-                            "diskSizeGB": 0  # Optional. The size of the OS Disk in
-                              gigabytes.
-                        }
-                    },
-                    "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
-                    "user": "str"  # Optional. The AAD object id of the user this Dev Box is
-                      assigned to.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_dev_boxes_list_all_dev_boxes_by_user_request(
-                    user_id=user_id,
-                    filter=filter,
-                    top=top,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace
-    def list_dev_boxes(
-        self,
-        project_name: str,
-        user_id: str = "me",
-        *,
-        filter: Optional[str] = None,
-        top: Optional[int] = None,
-        **kwargs: Any
-    ) -> AsyncIterable[JSON]:
+    def list_dev_boxes(self, endpoint: str, project_name: str, user_id: str, **kwargs: Any) -> AsyncIterable[JSON]:
         """Lists Dev Boxes in the project for a particular user.
 
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -1331,27 +1617,44 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 200
                 response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
                     "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
                       Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
                     "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
+                      This is state is based on previous"naction performed by user.
                     "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
                       Box.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -1371,8 +1674,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "localAdministrator": "str",  # Optional. Indicates whether the owner of the
                       Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
                     "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
+                      This will be the same region as the"nVirtual Network it is attached to.
                     "osType": "str",  # Optional. The operating system type of this Dev Box.
                       "Windows"
                     "powerState": "str",  # Optional. The current power state of the Dev Box.
@@ -1381,7 +1683,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "projectName": "str",  # Optional. Name of the project this Dev Box belongs
                       to.
                     "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
                     "storageProfile": {
                         "osDisk": {
                             "diskSizeGB": 0  # Optional. The size of the OS Disk in
@@ -1389,8 +1693,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         }
                     },
                     "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
                     "user": "str"  # Optional. The AAD object id of the user this Dev Box is
                       assigned to.
                 }
@@ -1414,16 +1717,12 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                 request = build_dev_boxes_list_dev_boxes_request(
                     project_name=project_name,
                     user_id=user_id,
-                    filter=filter,
-                    top=top,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -1441,9 +1740,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -1476,16 +1773,20 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncItemPaged(get_next, extract_data)
 
     @distributed_trace_async
-    async def get_dev_box(self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any) -> JSON:
+    async def get_dev_box(
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
+    ) -> JSON:
         """Gets a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
         :return: JSON object
         :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -1495,27 +1796,44 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 200
                 response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
                     "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
                       Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
                     "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
+                      This is state is based on previous"naction performed by user.
                     "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
                       Box.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -1535,8 +1853,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "localAdministrator": "str",  # Optional. Indicates whether the owner of the
                       Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
                     "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
+                      This will be the same region as the"nVirtual Network it is attached to.
                     "osType": "str",  # Optional. The operating system type of this Dev Box.
                       "Windows"
                     "powerState": "str",  # Optional. The current power state of the Dev Box.
@@ -1545,7 +1862,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "projectName": "str",  # Optional. Name of the project this Dev Box belongs
                       to.
                     "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
                     "storageProfile": {
                         "osDisk": {
                             "diskSizeGB": 0  # Optional. The size of the OS Disk in
@@ -1553,8 +1872,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         }
                     },
                     "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
                     "user": "str"  # Optional. The AAD object id of the user this Dev Box is
                       assigned to.
                 }
@@ -1574,14 +1892,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_get_dev_box_request(
             project_name=project_name,
-            dev_box_name=dev_box_name,
             user_id=user_id,
+            dev_box_name=dev_box_name,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -1609,7 +1927,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return cast(JSON, deserialized)
 
     async def _create_dev_box_initial(
-        self, project_name: str, dev_box_name: str, body: Union[JSON, IO], user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, body: Union[JSON, IO], **kwargs: Any
     ) -> JSON:
         error_map = {
             401: ClientAuthenticationError,
@@ -1635,8 +1953,8 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_create_dev_box_request(
             project_name=project_name,
-            dev_box_name=dev_box_name,
             user_id=user_id,
+            dev_box_name=dev_box_name,
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
@@ -1645,7 +1963,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -1662,6 +1980,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             map_error(status_code=response.status_code, response=response, error_map=error_map)
             raise HttpResponseError(response=response)
 
+        response_headers = {}
         if response.status_code == 200:
             if response.content:
                 deserialized = response.json()
@@ -1669,38 +1988,47 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                 deserialized = None
 
         if response.status_code == 201:
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Operation-Location"] = self._deserialize(
+                "str", response.headers.get("Operation-Location")
+            )
+
             if response.content:
                 deserialized = response.json()
             else:
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
 
         return cast(JSON, deserialized)  # type: ignore
 
     @overload
     async def begin_create_dev_box(
         self,
+        endpoint: str,
         project_name: str,
+        user_id: str,
         dev_box_name: str,
         body: JSON,
-        user_id: str = "me",
         *,
         content_type: str = "application/json",
         **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Creates or replaces a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute the operation. Required.
         :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
         :param dev_box_name: The name of a Dev Box. Required.
         :type dev_box_name: str
-        :param body: Represents a environment. Required.
+        :param body: Represents the body request of a Dev Box creation. Dev Box Pool name is required.
+         Optionally set the owner of the Dev Box as local administrator. Required.
         :type body: JSON
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
@@ -1720,27 +2048,44 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # JSON input template you can fill out and use as your body input.
                 body = {
+                    "name": "str",  # Display name for the Dev Box. Required.
                     "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
                       Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
                     "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
+                      This is state is based on previous"naction performed by user.
                     "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
                       Box.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -1760,8 +2105,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "localAdministrator": "str",  # Optional. Indicates whether the owner of the
                       Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
                     "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
+                      This will be the same region as the"nVirtual Network it is attached to.
                     "osType": "str",  # Optional. The operating system type of this Dev Box.
                       "Windows"
                     "powerState": "str",  # Optional. The current power state of the Dev Box.
@@ -1770,7 +2114,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "projectName": "str",  # Optional. Name of the project this Dev Box belongs
                       to.
                     "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
                     "storageProfile": {
                         "osDisk": {
                             "diskSizeGB": 0  # Optional. The size of the OS Disk in
@@ -1778,35 +2124,51 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         }
                     },
                     "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
                     "user": "str"  # Optional. The AAD object id of the user this Dev Box is
                       assigned to.
                 }
 
                 # response body for status code(s): 200, 201
                 response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
                     "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
                       Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
                     "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
+                      This is state is based on previous"naction performed by user.
                     "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
                       Box.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -1826,8 +2188,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "localAdministrator": "str",  # Optional. Indicates whether the owner of the
                       Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
                     "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
+                      This will be the same region as the"nVirtual Network it is attached to.
                     "osType": "str",  # Optional. The operating system type of this Dev Box.
                       "Windows"
                     "powerState": "str",  # Optional. The current power state of the Dev Box.
@@ -1836,7 +2197,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "projectName": "str",  # Optional. Name of the project this Dev Box belongs
                       to.
                     "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
                     "storageProfile": {
                         "osDisk": {
                             "diskSizeGB": 0  # Optional. The size of the OS Disk in
@@ -1844,8 +2207,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         }
                     },
                     "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
                     "user": "str"  # Optional. The AAD object id of the user this Dev Box is
                       assigned to.
                 }
@@ -1854,25 +2216,29 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
     @overload
     async def begin_create_dev_box(
         self,
+        endpoint: str,
         project_name: str,
+        user_id: str,
         dev_box_name: str,
         body: IO,
-        user_id: str = "me",
         *,
         content_type: str = "application/json",
         **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Creates or replaces a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute the operation. Required.
         :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
         :param dev_box_name: The name of a Dev Box. Required.
         :type dev_box_name: str
-        :param body: Represents a environment. Required.
+        :param body: Represents the body request of a Dev Box creation. Dev Box Pool name is required.
+         Optionally set the owner of the Dev Box as local administrator. Required.
         :type body: IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
@@ -1892,27 +2258,44 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 200, 201
                 response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
                     "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
                       Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
                     "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
+                      This is state is based on previous"naction performed by user.
                     "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
                       Box.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -1932,8 +2315,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "localAdministrator": "str",  # Optional. Indicates whether the owner of the
                       Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
                     "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
+                      This will be the same region as the"nVirtual Network it is attached to.
                     "osType": "str",  # Optional. The operating system type of this Dev Box.
                       "Windows"
                     "powerState": "str",  # Optional. The current power state of the Dev Box.
@@ -1942,7 +2324,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "projectName": "str",  # Optional. Name of the project this Dev Box belongs
                       to.
                     "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
                     "storageProfile": {
                         "osDisk": {
                             "diskSizeGB": 0  # Optional. The size of the OS Disk in
@@ -1950,8 +2334,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         }
                     },
                     "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
                     "user": "str"  # Optional. The AAD object id of the user this Dev Box is
                       assigned to.
                 }
@@ -1959,19 +2342,23 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def begin_create_dev_box(
-        self, project_name: str, dev_box_name: str, body: Union[JSON, IO], user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, body: Union[JSON, IO], **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Creates or replaces a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute the operation. Required.
         :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
         :param dev_box_name: The name of a Dev Box. Required.
         :type dev_box_name: str
-        :param body: Represents a environment. Is either a JSON type or a IO type. Required.
+        :param body: Represents the body request of a Dev Box creation. Dev Box Pool name is required.
+         Optionally set the owner of the Dev Box as local administrator. Is either a JSON type or a IO
+         type. Required.
         :type body: JSON or IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
         :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
          Default value is None.
         :paramtype content_type: str
@@ -1991,27 +2378,44 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # JSON input template you can fill out and use as your body input.
                 body = {
+                    "name": "str",  # Display name for the Dev Box. Required.
                     "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
                       Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
                     "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
+                      This is state is based on previous"naction performed by user.
                     "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
                       Box.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -2031,8 +2435,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "localAdministrator": "str",  # Optional. Indicates whether the owner of the
                       Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
                     "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
+                      This will be the same region as the"nVirtual Network it is attached to.
                     "osType": "str",  # Optional. The operating system type of this Dev Box.
                       "Windows"
                     "powerState": "str",  # Optional. The current power state of the Dev Box.
@@ -2041,7 +2444,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "projectName": "str",  # Optional. Name of the project this Dev Box belongs
                       to.
                     "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
                     "storageProfile": {
                         "osDisk": {
                             "diskSizeGB": 0  # Optional. The size of the OS Disk in
@@ -2049,35 +2454,51 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         }
                     },
                     "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
                     "user": "str"  # Optional. The AAD object id of the user this Dev Box is
                       assigned to.
                 }
 
                 # response body for status code(s): 200, 201
                 response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
                     "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
                       Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
                     "actionState": "str",  # Optional. The current action state of the Dev Box.
-                      This is state is based on previous action performed by user.
+                      This is state is based on previous"naction performed by user.
                     "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
                       Box.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "hardwareProfile": {
                         "memoryGB": 0,  # Optional. The amount of memory available for the
                           Dev Box.
-                        "skuName": "str",  # Optional. The name of the SKU.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
                         "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
                           Box.
                     },
@@ -2097,8 +2518,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "localAdministrator": "str",  # Optional. Indicates whether the owner of the
                       Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
                     "location": "str",  # Optional. Azure region where this Dev Box is located.
-                      This will be the same region as the Virtual Network it is attached to.
-                    "name": "str",  # Optional. Display name for the Dev Box.
+                      This will be the same region as the"nVirtual Network it is attached to.
                     "osType": "str",  # Optional. The operating system type of this Dev Box.
                       "Windows"
                     "powerState": "str",  # Optional. The current power state of the Dev Box.
@@ -2107,7 +2527,9 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "projectName": "str",  # Optional. Name of the project this Dev Box belongs
                       to.
                     "provisioningState": "str",  # Optional. The current provisioning state of
-                      the Dev Box.
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
                     "storageProfile": {
                         "osDisk": {
                             "diskSizeGB": 0  # Optional. The size of the OS Disk in
@@ -2115,8 +2537,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                         }
                     },
                     "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
-                      a GUID-formatted string (e.g. 00000000-0000-0000-0000-000000000000).
-                    "uri": "str",  # Optional. The unique URI of the dev box.
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
                     "user": "str"  # Optional. The AAD object id of the user this Dev Box is
                       assigned to.
                 }
@@ -2131,10 +2552,11 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
         if cont_token is None:
             raw_result = await self._create_dev_box_initial(
+                endpoint=endpoint,
                 project_name=project_name,
+                user_id=user_id,
                 dev_box_name=dev_box_name,
                 body=body,
-                user_id=user_id,
                 content_type=content_type,
                 cls=lambda x, y, z: x,
                 headers=_headers,
@@ -2154,18 +2576,13 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             return deserialized
 
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
 
         if polling is True:
             polling_method: AsyncPollingMethod = cast(
                 AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "original-uri"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
             )
         elif polling is False:
             polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
@@ -2181,7 +2598,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     async def _delete_dev_box_initial(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> Optional[JSON]:
         error_map = {
             401: ClientAuthenticationError,
@@ -2198,14 +2615,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_delete_dev_box_request(
             project_name=project_name,
-            dev_box_name=dev_box_name,
             user_id=user_id,
+            dev_box_name=dev_box_name,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -2225,6 +2642,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         deserialized = None
         response_headers = {}
         if response.status_code == 202:
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
             response_headers["Operation-Location"] = self._deserialize(
                 "str", response.headers.get("Operation-Location")
             )
@@ -2241,17 +2659,19 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def begin_delete_dev_box(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Deletes a Dev Box.
 
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
         :param dev_box_name: The name of a Dev Box. Required.
         :type dev_box_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
         :keyword str continuation_token: A continuation token to restart a poller from a saved state.
         :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
          for this operation to not poll, or pass in your own initialized polling object for a personal
@@ -2268,14 +2688,26 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 202
                 response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
                     "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
                     "percentComplete": 0.0,  # Optional. Percent of the operation that is
                       complete.
                     "properties": {},  # Optional. Custom operation properties, populated only
@@ -2294,9 +2726,10 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
         if cont_token is None:
             raw_result = await self._delete_dev_box_initial(
+                endpoint=endpoint,
                 project_name=project_name,
-                dev_box_name=dev_box_name,
                 user_id=user_id,
+                dev_box_name=dev_box_name,
                 cls=lambda x, y, z: x,
                 headers=_headers,
                 params=_params,
@@ -2307,6 +2740,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         def get_long_running_output(pipeline_response):
             response_headers = {}
             response = pipeline_response.http_response
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
             response_headers["Operation-Location"] = self._deserialize(
                 "str", response.headers.get("Operation-Location")
             )
@@ -2320,18 +2754,13 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             return deserialized
 
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
 
         if polling is True:
             polling_method: AsyncPollingMethod = cast(
                 AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "operation-location"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
             )
         elif polling is False:
             polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
@@ -2347,7 +2776,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     async def _start_dev_box_initial(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> JSON:
         error_map = {
             401: ClientAuthenticationError,
@@ -2364,14 +2793,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_start_dev_box_request(
             project_name=project_name,
-            dev_box_name=dev_box_name,
             user_id=user_id,
+            dev_box_name=dev_box_name,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -2403,17 +2832,19 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def begin_start_dev_box(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Starts a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
         :keyword str continuation_token: A continuation token to restart a poller from a saved state.
         :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
          for this operation to not poll, or pass in your own initialized polling object for a personal
@@ -2430,14 +2861,26 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 202
                 response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
                     "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
                     "percentComplete": 0.0,  # Optional. Percent of the operation that is
                       complete.
                     "properties": {},  # Optional. Custom operation properties, populated only
@@ -2456,9 +2899,10 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
         if cont_token is None:
             raw_result = await self._start_dev_box_initial(
+                endpoint=endpoint,
                 project_name=project_name,
-                dev_box_name=dev_box_name,
                 user_id=user_id,
+                dev_box_name=dev_box_name,
                 cls=lambda x, y, z: x,
                 headers=_headers,
                 params=_params,
@@ -2482,18 +2926,13 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             return deserialized
 
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
 
         if polling is True:
             polling_method: AsyncPollingMethod = cast(
                 AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "operation-location"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
             )
         elif polling is False:
             polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
@@ -2510,9 +2949,10 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     async def _stop_dev_box_initial(
         self,
+        endpoint: str,
         project_name: str,
+        user_id: str,
         dev_box_name: str,
-        user_id: str = "me",
         *,
         hibernate: Optional[bool] = None,
         **kwargs: Any
@@ -2532,15 +2972,15 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_stop_dev_box_request(
             project_name=project_name,
-            dev_box_name=dev_box_name,
             user_id=user_id,
+            dev_box_name=dev_box_name,
             hibernate=hibernate,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -2573,22 +3013,25 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
     @distributed_trace_async
     async def begin_stop_dev_box(
         self,
+        endpoint: str,
         project_name: str,
+        user_id: str,
         dev_box_name: str,
-        user_id: str = "me",
         *,
         hibernate: Optional[bool] = None,
         **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Stops a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
         :keyword hibernate: Optional parameter to hibernate the dev box. Default value is None.
         :paramtype hibernate: bool
         :keyword str continuation_token: A continuation token to restart a poller from a saved state.
@@ -2607,14 +3050,26 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 202
                 response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
                     "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
                     "percentComplete": 0.0,  # Optional. Percent of the operation that is
                       complete.
                     "properties": {},  # Optional. Custom operation properties, populated only
@@ -2633,9 +3088,10 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
         if cont_token is None:
             raw_result = await self._stop_dev_box_initial(
+                endpoint=endpoint,
                 project_name=project_name,
-                dev_box_name=dev_box_name,
                 user_id=user_id,
+                dev_box_name=dev_box_name,
                 hibernate=hibernate,
                 cls=lambda x, y, z: x,
                 headers=_headers,
@@ -2660,18 +3116,13 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             return deserialized
 
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
 
         if polling is True:
             polling_method: AsyncPollingMethod = cast(
                 AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "operation-location"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
             )
         elif polling is False:
             polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
@@ -2687,7 +3138,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     async def _restart_dev_box_initial(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> JSON:
         error_map = {
             401: ClientAuthenticationError,
@@ -2704,14 +3155,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_restart_dev_box_request(
             project_name=project_name,
-            dev_box_name=dev_box_name,
             user_id=user_id,
+            dev_box_name=dev_box_name,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -2743,17 +3194,19 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def begin_restart_dev_box(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Restarts a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
         :keyword str continuation_token: A continuation token to restart a poller from a saved state.
         :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
          for this operation to not poll, or pass in your own initialized polling object for a personal
@@ -2770,14 +3223,26 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 202
                 response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
                     "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
                     "percentComplete": 0.0,  # Optional. Percent of the operation that is
                       complete.
                     "properties": {},  # Optional. Custom operation properties, populated only
@@ -2796,9 +3261,10 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
         if cont_token is None:
             raw_result = await self._restart_dev_box_initial(
+                endpoint=endpoint,
                 project_name=project_name,
-                dev_box_name=dev_box_name,
                 user_id=user_id,
+                dev_box_name=dev_box_name,
                 cls=lambda x, y, z: x,
                 headers=_headers,
                 params=_params,
@@ -2822,18 +3288,13 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             return deserialized
 
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
 
         if polling is True:
             polling_method: AsyncPollingMethod = cast(
                 AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "operation-location"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
             )
         elif polling is False:
             polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
@@ -2849,7 +3310,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     async def _repair_dev_box_initial(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> JSON:
         error_map = {
             401: ClientAuthenticationError,
@@ -2866,14 +3327,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_repair_dev_box_request(
             project_name=project_name,
-            dev_box_name=dev_box_name,
             user_id=user_id,
+            dev_box_name=dev_box_name,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -2905,18 +3366,20 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def begin_repair_dev_box(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> AsyncLROPoller[JSON]:
         """Attempts automated repair steps to resolve common problems on a Dev Box. The Dev Box may
         restart during this operation.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
         :keyword str continuation_token: A continuation token to restart a poller from a saved state.
         :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
          for this operation to not poll, or pass in your own initialized polling object for a personal
@@ -2933,14 +3396,26 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 # response body for status code(s): 202
                 response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
                     "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
                     "percentComplete": 0.0,  # Optional. Percent of the operation that is
                       complete.
                     "properties": {},  # Optional. Custom operation properties, populated only
@@ -2959,9 +3434,10 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
         if cont_token is None:
             raw_result = await self._repair_dev_box_initial(
+                endpoint=endpoint,
                 project_name=project_name,
-                dev_box_name=dev_box_name,
                 user_id=user_id,
+                dev_box_name=dev_box_name,
                 cls=lambda x, y, z: x,
                 headers=_headers,
                 params=_params,
@@ -2985,18 +3461,13 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
             return deserialized
 
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
 
         if polling is True:
             polling_method: AsyncPollingMethod = cast(
                 AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "operation-location"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
             )
         elif polling is False:
             polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
@@ -3012,779 +3483,20 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
-    def list_customization_groups(
-        self,
-        project_name: str,
-        dev_box_name: str,
-        user_id: str = "me",
-        *,
-        include: Optional[List[str]] = None,
-        **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists customization groups on the Dev Box. Listed customization groups exclude task information
-        unless specified via the include parameter.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword include: Optional query parameter to specify what properties should be included in the
-         response. Default value is None.
-        :paramtype include: list[str]
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
-                      group.
-                    "name": "str",  # Optional. Name of the customization group.
-                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
-                      customization group.
-                    "status": "str",  # Optional. Status of the customization group. Known values
-                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ],
-                    "uri": "str"  # Optional. The unique URI of the customization group.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_dev_boxes_list_customization_groups_request(
-                    project_name=project_name,
-                    dev_box_name=dev_box_name,
-                    user_id=user_id,
-                    include=include,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace_async
-    async def get_customization_group(
-        self, project_name: str, dev_box_name: str, customization_group_name: str, user_id: str = "me", **kwargs: Any
-    ) -> JSON:
-        """Gets a customization group.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param customization_group_name: A customization group name. Required.
-        :type customization_group_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
-                      group.
-                    "name": "str",  # Optional. Name of the customization group.
-                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
-                      customization group.
-                    "status": "str",  # Optional. Status of the customization group. Known values
-                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ],
-                    "uri": "str"  # Optional. The unique URI of the customization group.
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_dev_boxes_get_customization_group_request(
-            project_name=project_name,
-            dev_box_name=dev_box_name,
-            customization_group_name=customization_group_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @overload
-    async def create_customization_group(
-        self,
-        project_name: str,
-        dev_box_name: str,
-        customization_group_name: str,
-        body: JSON,
-        user_id: str = "me",
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> JSON:
-        """Applies customizations to the Dev Box.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param customization_group_name: A customization group name. Required.
-        :type customization_group_name: str
-        :param body: Represents a customization group. Required.
-        :type body: JSON
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
-                      group.
-                    "name": "str",  # Optional. Name of the customization group.
-                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
-                      customization group.
-                    "status": "str",  # Optional. Status of the customization group. Known values
-                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ],
-                    "uri": "str"  # Optional. The unique URI of the customization group.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
-                      group.
-                    "name": "str",  # Optional. Name of the customization group.
-                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
-                      customization group.
-                    "status": "str",  # Optional. Status of the customization group. Known values
-                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ],
-                    "uri": "str"  # Optional. The unique URI of the customization group.
-                }
-        """
-
-    @overload
-    async def create_customization_group(
-        self,
-        project_name: str,
-        dev_box_name: str,
-        customization_group_name: str,
-        body: IO,
-        user_id: str = "me",
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> JSON:
-        """Applies customizations to the Dev Box.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param customization_group_name: A customization group name. Required.
-        :type customization_group_name: str
-        :param body: Represents a customization group. Required.
-        :type body: IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
-                      group.
-                    "name": "str",  # Optional. Name of the customization group.
-                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
-                      customization group.
-                    "status": "str",  # Optional. Status of the customization group. Known values
-                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ],
-                    "uri": "str"  # Optional. The unique URI of the customization group.
-                }
-        """
-
-    @distributed_trace_async
-    async def create_customization_group(
-        self,
-        project_name: str,
-        dev_box_name: str,
-        customization_group_name: str,
-        body: Union[JSON, IO],
-        user_id: str = "me",
-        **kwargs: Any
-    ) -> JSON:
-        """Applies customizations to the Dev Box.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param customization_group_name: A customization group name. Required.
-        :type customization_group_name: str
-        :param body: Represents a customization group. Is either a JSON type or a IO type. Required.
-        :type body: JSON or IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
-         Default value is None.
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
-                      group.
-                    "name": "str",  # Optional. Name of the customization group.
-                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
-                      customization group.
-                    "status": "str",  # Optional. Status of the customization group. Known values
-                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ],
-                    "uri": "str"  # Optional. The unique URI of the customization group.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
-                      group.
-                    "name": "str",  # Optional. Name of the customization group.
-                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
-                      customization group.
-                    "status": "str",  # Optional. Status of the customization group. Known values
-                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ],
-                    "uri": "str"  # Optional. The unique URI of the customization group.
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(body, (IOBase, bytes)):
-            _content = body
-        else:
-            _json = body
-
-        request = build_dev_boxes_create_customization_group_request(
-            project_name=project_name,
-            dev_box_name=dev_box_name,
-            customization_group_name=customization_group_name,
-            user_id=user_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @distributed_trace_async
-    async def get_customization_task_log(
-        self,
-        project_name: str,
-        dev_box_name: str,
-        customization_group_name: str,
-        customization_task_id: str,
-        user_id: str = "me",
-        **kwargs: Any
-    ) -> AsyncIterator[bytes]:
-        """Gets the log for a customization task.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param customization_group_name: A customization group name. Required.
-        :type customization_group_name: str
-        :param customization_task_id: A customization task ID. Required.
-        :type customization_task_id: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: Async iterator of the response bytes
-        :rtype: AsyncIterator[bytes]
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[AsyncIterator[bytes]] = kwargs.pop("cls", None)
-
-        request = build_dev_boxes_get_customization_task_log_request(
-            project_name=project_name,
-            dev_box_name=dev_box_name,
-            customization_group_name=customization_group_name,
-            customization_task_id=customization_task_id,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = True
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        deserialized = response.iter_bytes()
-
-        if cls:
-            return cls(pipeline_response, cast(AsyncIterator[bytes], deserialized), {})
-
-        return cast(AsyncIterator[bytes], deserialized)
-
-    @distributed_trace_async
-    async def get_remote_connection(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
-    ) -> JSON:
-        """Gets RDP Connection info.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "cloudPcConnectionUrl": "str",  # Optional. Link to open a remote desktop
-                      session via a dev box's underlying Cloud PC. (This will default to Windows App).
-                    "rdpConnectionUrl": "str",  # Optional. Link to open a Remote Desktop
-                      session.
-                    "webUrl": "str"  # Optional. URL to open a browser based RDP session.
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_dev_boxes_get_remote_connection_request(
-            project_name=project_name,
-            dev_box_name=dev_box_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @distributed_trace
     def list_actions(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> AsyncIterable[JSON]:
         """Lists actions on a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -3829,16 +3541,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 request = build_dev_boxes_list_actions_request(
                     project_name=project_name,
-                    dev_box_name=dev_box_name,
                     user_id=user_id,
+                    dev_box_name=dev_box_name,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -3856,9 +3566,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -3892,19 +3600,21 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def get_action(
-        self, project_name: str, dev_box_name: str, action_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, action_name: str, **kwargs: Any
     ) -> JSON:
         """Gets an action.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param action_name: The name of an action that will take place on a Dev Box. Required.
-        :type action_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
+        :param action_name: The name of the action. Required.
+        :type action_name: str
         :return: JSON object
         :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -3946,15 +3656,15 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_get_action_request(
             project_name=project_name,
+            user_id=user_id,
             dev_box_name=dev_box_name,
             action_name=action_name,
-            user_id=user_id,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -3983,19 +3693,21 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def skip_action(  # pylint: disable=inconsistent-return-statements
-        self, project_name: str, dev_box_name: str, action_name: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, action_name: str, **kwargs: Any
     ) -> None:
         """Skips an occurrence of an action.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param action_name: The name of an action that will take place on a Dev Box. Required.
-        :type action_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
+        :param action_name: The name of the action. Required.
+        :type action_name: str
         :return: None
         :rtype: None
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -4015,15 +3727,15 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_skip_action_request(
             project_name=project_name,
+            user_id=user_id,
             dev_box_name=dev_box_name,
             action_name=action_name,
-            user_id=user_id,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -4046,27 +3758,30 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
     @distributed_trace_async
     async def delay_action(
         self,
+        endpoint: str,
         project_name: str,
+        user_id: str,
         dev_box_name: str,
         action_name: str,
-        user_id: str = "me",
         *,
-        until: datetime.datetime,
+        delay_until: datetime.datetime,
         **kwargs: Any
     ) -> JSON:
         """Delays the occurrence of an action.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param action_name: The name of an action that will take place on a Dev Box. Required.
-        :type action_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
-        :keyword until: The time to delay the Dev Box action or actions until. Required.
-        :paramtype until: ~datetime.datetime
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
+        :param action_name: The name of the action. Required.
+        :type action_name: str
+        :keyword delay_until: The time to delay the Dev Box action or actions until. Required.
+        :paramtype delay_until: ~datetime.datetime
         :return: JSON object
         :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -4108,16 +3823,16 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_delay_action_request(
             project_name=project_name,
+            user_id=user_id,
             dev_box_name=dev_box_name,
             action_name=action_name,
-            user_id=user_id,
-            until=until,
+            delay_until=delay_until,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -4146,19 +3861,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace
     def delay_all_actions(
-        self, project_name: str, dev_box_name: str, user_id: str = "me", *, until: datetime.datetime, **kwargs: Any
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        dev_box_name: str,
+        *,
+        delay_until: datetime.datetime,
+        **kwargs: Any
     ) -> AsyncIterable[JSON]:
         """Delays all actions.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
-        :keyword until: The time to delay the Dev Box action or actions until. Required.
-        :paramtype until: ~datetime.datetime
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
+        :keyword delay_until: The time to delay the Dev Box action or actions until. Required.
+        :paramtype delay_until: ~datetime.datetime
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -4191,15 +3915,19 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                           time that the action could occur (UTC).
                     },
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     }
                 }
         """
@@ -4221,17 +3949,15 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 request = build_dev_boxes_delay_all_actions_request(
                     project_name=project_name,
-                    dev_box_name=dev_box_name,
                     user_id=user_id,
-                    until=until,
+                    dev_box_name=dev_box_name,
+                    delay_until=delay_until,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -4249,9 +3975,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -4284,30 +4008,729 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
         return AsyncItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_operations(
+    def list_customization_groups(
         self,
+        endpoint: str,
         project_name: str,
+        user_id: str,
         dev_box_name: str,
-        user_id: str = "me",
         *,
-        top: Optional[int] = None,
-        filter: Optional[str] = None,
+        include: Optional[str] = None,
         **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Lists customization groups on the Dev Box. Listed customization groups exclude
+          task information unless specified via the include parameter.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
+        :keyword include: Optional query parameter to specify what properties should be included in the
+         response. "tasks" Default value is None.
+        :paramtype include: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Name of the customization group. Required.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
+                      group.
+                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
+                      customization group.
+                    "status": "str",  # Optional. Status of the customization group. Known values
+                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ],
+                    "uri": "str"  # Optional. The unique URI of the customization group.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_boxes_list_customization_groups_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    dev_box_name=dev_box_name,
+                    include=include,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace_async
+    async def get_customization_group(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        dev_box_name: str,
+        customization_group_name: str,
+        **kwargs: Any
+    ) -> JSON:
+        """Gets a customization group.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
+        :param customization_group_name: Name of the customization group. Required.
+        :type customization_group_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Name of the customization group. Required.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
+                      group.
+                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
+                      customization group.
+                    "status": "str",  # Optional. Status of the customization group. Known values
+                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ],
+                    "uri": "str"  # Optional. The unique URI of the customization group.
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_dev_boxes_get_customization_group_request(
+            project_name=project_name,
+            user_id=user_id,
+            dev_box_name=dev_box_name,
+            customization_group_name=customization_group_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @overload
+    async def create_customization_group(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        dev_box_name: str,
+        customization_group_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Applies customizations to the Dev Box.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+           authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: The name of a Dev Box. Required.
+        :type dev_box_name: str
+        :param customization_group_name: A customization group name. Required.
+        :type customization_group_name: str
+        :param body: Represents the body request of a Dev Box creation. Dev Box Pool name is required.
+         Optionally set the owner of the Dev Box as local administrator. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "name": "str",  # Name of the customization group. Required.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
+                      group.
+                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
+                      customization group.
+                    "status": "str",  # Optional. Status of the customization group. Known values
+                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ],
+                    "uri": "str"  # Optional. The unique URI of the customization group.
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Name of the customization group. Required.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
+                      group.
+                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
+                      customization group.
+                    "status": "str",  # Optional. Status of the customization group. Known values
+                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ],
+                    "uri": "str"  # Optional. The unique URI of the customization group.
+                }
+        """
+
+    @overload
+    async def create_customization_group(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        dev_box_name: str,
+        customization_group_name: str,
+        body: IO,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Applies customizations to the Dev Box.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+           authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: The name of a Dev Box. Required.
+        :type dev_box_name: str
+        :param customization_group_name: A customization group name. Required.
+        :type customization_group_name: str
+        :param body: Represents the body request of a Dev Box creation. Dev Box Pool name is required.
+         Optionally set the owner of the Dev Box as local administrator. Required.
+        :type body: IO
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Name of the customization group. Required.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
+                      group.
+                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
+                      customization group.
+                    "status": "str",  # Optional. Status of the customization group. Known values
+                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ],
+                    "uri": "str"  # Optional. The unique URI of the customization group.
+                }
+        """
+
+    @distributed_trace_async
+    async def create_customization_group(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        dev_box_name: str,
+        customization_group_name: str,
+        body: Union[JSON, IO],
+        **kwargs: Any
+    ) -> JSON:
+        """Applies customizations to the Dev Box.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+           authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: The name of a Dev Box. Required.
+        :type dev_box_name: str
+        :param customization_group_name: A customization group name. Required.
+        :type customization_group_name: str
+        :param body: Represents the body request of a Dev Box creation. Dev Box Pool name is required.
+         Optionally set the owner of the Dev Box as local administrator. Is either a JSON type or a IO
+         type. Required.
+        :type body: JSON or IO
+        :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
+         Default value is None.
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "name": "str",  # Name of the customization group. Required.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
+                      group.
+                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
+                      customization group.
+                    "status": "str",  # Optional. Status of the customization group. Known values
+                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ],
+                    "uri": "str"  # Optional. The unique URI of the customization group.
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Name of the customization group. Required.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. End time of the customization
+                      group.
+                    "startTime": "2020-02-20 00:00:00",  # Optional. Start time of the
+                      customization group.
+                    "status": "str",  # Optional. Status of the customization group. Known values
+                      are: "NotStarted", "Running", "Succeeded", "Failed", and "ValidationFailed".
+                    "tasks": [
+                        {
+                            "name": "str",  # Name of the task. Required.
+                            "displayName": "str",  # Optional. Display name to help
+                              differentiate multiple instances of the same task.
+                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
+                              the task.
+                            "id": "str",  # Optional. ID of the task instance.
+                            "logUri": "str",  # Optional. The unique URI for retrieving
+                              the task logs.
+                            "parameters": {
+                                "str": "str"  # Optional. Parameters for the task.
+                            },
+                            "runAs": "str",  # Optional. What account to run the task as.
+                              Known values are: "System" and "User".
+                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
+                              of the task.
+                            "status": "str",  # Optional. Status of the task. Known
+                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
+                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
+                              "WaitingForUserSession".
+                            "timeoutInSeconds": 0  # Optional. Timeout, in seconds.
+                              Overrides any timeout provided on the task definition.
+                        }
+                    ],
+                    "uri": "str"  # Optional. The unique URI of the customization group.
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
+
+        request = build_dev_boxes_create_customization_group_request(
+            project_name=project_name,
+            user_id=user_id,
+            dev_box_name=dev_box_name,
+            customization_group_name=customization_group_name,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace_async
+    async def get_customization_task_log(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        dev_box_name: str,
+        customization_group_name: str,
+        customization_task_id: str,
+        **kwargs: Any
+    ) -> str:
+        """Gets the log for a customization task.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+           authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: The name of a Dev Box. Required.
+        :type dev_box_name: str
+        :param customization_group_name: A customization group name. Required.
+        :type customization_group_name: str
+        :param customization_task_id: A customization task ID. Required.
+        :type customization_task_id: str
+        :return: str
+        :rtype: str
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[str] = kwargs.pop("cls", None)
+
+        request = build_dev_boxes_get_customization_task_log_request(
+            project_name=project_name,
+            user_id=user_id,
+            dev_box_name=dev_box_name,
+            customization_group_name=customization_group_name,
+            customization_task_id=customization_task_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(str, deserialized), {})
+
+        return cast(str, deserialized)
+
+    @distributed_trace
+    def list_operations(
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
     ) -> AsyncIterable[JSON]:
         """Lists operations on the Dev Box which have occurred within the past 90 days.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -4323,22 +4746,26 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "result": {
                         "code": "str",  # Optional. The result code associated with the
@@ -4349,7 +4776,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                           operation. Known values are: "FixApplied", "IssuesDetected", and
                           "NoIssuesDetected".
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4359,24 +4786,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4386,24 +4817,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4413,24 +4848,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4455,18 +4894,14 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
                 request = build_dev_boxes_list_operations_request(
                     project_name=project_name,
-                    dev_box_name=dev_box_name,
                     user_id=user_id,
-                    top=top,
-                    filter=filter,
+                    dev_box_name=dev_box_name,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -4484,9 +4919,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -4520,19 +4953,21 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
     @distributed_trace_async
     async def get_operation(
-        self, project_name: str, dev_box_name: str, operation_id: str, user_id: str = "me", **kwargs: Any
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, operation_id: str, **kwargs: Any
     ) -> JSON:
         """Gets an operation on a Dev Box.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param dev_box_name: The name of a Dev Box. Required.
-        :type dev_box_name: str
-        :param operation_id: The id of the operation on a Dev Box. Required.
-        :type operation_id: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+         authentication context. Required.
         :type user_id: str
+        :param dev_box_name: Display name for the Dev Box. Required.
+        :type dev_box_name: str
+        :param operation_id: Unique identifier for the Dev Box operation. Required.
+        :type operation_id: str
         :return: JSON object
         :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -4548,22 +4983,26 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
                     "result": {
                         "code": "str",  # Optional. The result code associated with the
@@ -4574,7 +5013,7 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                           operation. Known values are: "FixApplied", "IssuesDetected", and
                           "NoIssuesDetected".
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4584,24 +5023,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4611,24 +5054,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4638,24 +5085,28 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
                     "operationId": "str",  # Unique identifier for the Dev Box operation.
                       Required.
                     "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
                     "uri": "str",  # The unique URI for the Dev Box operation. Required.
                     "createdByObjectId": "str",  # Optional. The object ID of the actor which
                       initiated the operation.
                     "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
                       finished.
                     "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
                         "details": [
                             ...
                         ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
                     },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                    "startTime": "2020-02-20 00:00:00"  # Optional. he time the operation
                       started.
                 }
 
@@ -4677,8 +5128,1099 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         request = build_dev_boxes_get_operation_request(
             project_name=project_name,
+            user_id=user_id,
             dev_box_name=dev_box_name,
             operation_id=operation_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace_async
+    async def get_remote_connection(
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
+    ) -> JSON:
+        """Gets RDP Connection info.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: The name of a Dev Box. Required.
+        :type dev_box_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "cloudPcConnectionUrl": "str",  # Optional. Link to open a remote desktop
+                      session via a dev box's underlying Cloud PC (This will default to Windows App).
+                    "rdpConnectionUrl": "str",  # Optional. Link to open a Remote Desktop
+                      session.
+                    "webUrl": "str"  # Optional. URL to open a browser based RDP session.
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_dev_boxes_get_remote_connection_request(
+            project_name=project_name,
+            user_id=user_id,
+            dev_box_name=dev_box_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace
+    def list_dev_box_sessions(
+        self, endpoint: str, project_name: str, user_id: str, dev_box_name: str, **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Lists DevBox sessions for a particular Dev Box.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param dev_box_name: The name of a Dev Box. Required.
+        :type dev_box_name: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "devBoxName": "str",  # Display name for the Dev Box. Required.
+                    "endTime": "2020-02-20 00:00:00",  # End time of this Dev Box session.
+                      Required.
+                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
+                      Required.
+                    "projectName": "str",  # Name of the project this Dev Box belongs to.
+                      Required.
+                    "sessionType": "str",  # Indicates how the connection to the Dev Box was made
+                      for the session. Required. "RemoteDesktop"
+                    "startTime": "2020-02-20 00:00:00",  # Start time of this Dev Box session.
+                      Required.
+                    "uniqueId": "str"  # A unique identifier for the Dev Box. This is a
+                      GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000). Required.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_boxes_list_dev_box_sessions_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    dev_box_name=dev_box_name,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_inactive_dev_boxes_by_user(
+        self, endpoint: str, project_name: str, user_id: str, *, days: int, **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Lists Dev Boxes in the project for a particular user that have not been connected to for a
+        given number of days.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :keyword days: The number of days before today to consider for the usage of a user's dev boxes.
+         Required.
+        :paramtype days: int
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
+                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
+                      Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
+                    "actionState": "str",  # Optional. The current action state of the Dev Box.
+                      This is state is based on previous"naction performed by user.
+                    "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
+                      Box.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "hardwareProfile": {
+                        "memoryGB": 0,  # Optional. The amount of memory available for the
+                          Dev Box.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
+                        "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
+                          Box.
+                    },
+                    "hibernateSupport": "str",  # Optional. Indicates whether hibernate is
+                      enabled/disabled or unknown. Known values are: "Enabled", "Disabled", and
+                      "OsUnsupported".
+                    "imageReference": {
+                        "name": "str",  # Optional. The name of the image used.
+                        "operatingSystem": "str",  # Optional. The operating system of the
+                          image.
+                        "osBuildNumber": "str",  # Optional. The operating system build
+                          number of the image.
+                        "publishedDate": "2020-02-20 00:00:00",  # Optional. The datetime
+                          that the backing image version was published.
+                        "version": "str"  # Optional. The version of the image.
+                    },
+                    "localAdministrator": "str",  # Optional. Indicates whether the owner of the
+                      Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
+                    "location": "str",  # Optional. Azure region where this Dev Box is located.
+                      This will be the same region as the"nVirtual Network it is attached to.
+                    "osType": "str",  # Optional. The operating system type of this Dev Box.
+                      "Windows"
+                    "powerState": "str",  # Optional. The current power state of the Dev Box.
+                      Known values are: "Unknown", "Running", "Deallocated", "PoweredOff", and
+                      "Hibernated".
+                    "projectName": "str",  # Optional. Name of the project this Dev Box belongs
+                      to.
+                    "provisioningState": "str",  # Optional. The current provisioning state of
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
+                    "storageProfile": {
+                        "osDisk": {
+                            "diskSizeGB": 0  # Optional. The size of the OS Disk in
+                              gigabytes.
+                        }
+                    },
+                    "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
+                    "user": "str"  # Optional. The AAD object id of the user this Dev Box is
+                      assigned to.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_boxes_list_inactive_dev_boxes_by_user_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    days=days,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_low_usage_dev_boxes_by_user(
+        self, endpoint: str, project_name: str, user_id: str, *, days: int, hours: int, **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Lists Dev Boxes in the project for a particular user that have seen less usage than a given
+        threshold (in hours) over a given number of days.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :keyword days: The number of days before today to consider for the usage of a user's dev boxes.
+         Required.
+        :paramtype days: int
+        :keyword hours: The threshold usage in hours for dev boxes to be considered low usage.
+         Required.
+        :paramtype hours: int
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
+                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
+                      Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
+                    "actionState": "str",  # Optional. The current action state of the Dev Box.
+                      This is state is based on previous"naction performed by user.
+                    "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
+                      Box.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "hardwareProfile": {
+                        "memoryGB": 0,  # Optional. The amount of memory available for the
+                          Dev Box.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
+                        "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
+                          Box.
+                    },
+                    "hibernateSupport": "str",  # Optional. Indicates whether hibernate is
+                      enabled/disabled or unknown. Known values are: "Enabled", "Disabled", and
+                      "OsUnsupported".
+                    "imageReference": {
+                        "name": "str",  # Optional. The name of the image used.
+                        "operatingSystem": "str",  # Optional. The operating system of the
+                          image.
+                        "osBuildNumber": "str",  # Optional. The operating system build
+                          number of the image.
+                        "publishedDate": "2020-02-20 00:00:00",  # Optional. The datetime
+                          that the backing image version was published.
+                        "version": "str"  # Optional. The version of the image.
+                    },
+                    "localAdministrator": "str",  # Optional. Indicates whether the owner of the
+                      Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
+                    "location": "str",  # Optional. Azure region where this Dev Box is located.
+                      This will be the same region as the"nVirtual Network it is attached to.
+                    "osType": "str",  # Optional. The operating system type of this Dev Box.
+                      "Windows"
+                    "powerState": "str",  # Optional. The current power state of the Dev Box.
+                      Known values are: "Unknown", "Running", "Deallocated", "PoweredOff", and
+                      "Hibernated".
+                    "projectName": "str",  # Optional. Name of the project this Dev Box belongs
+                      to.
+                    "provisioningState": "str",  # Optional. The current provisioning state of
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
+                    "storageProfile": {
+                        "osDisk": {
+                            "diskSizeGB": 0  # Optional. The size of the OS Disk in
+                              gigabytes.
+                        }
+                    },
+                    "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
+                    "user": "str"  # Optional. The AAD object id of the user this Dev Box is
+                      assigned to.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_boxes_list_low_usage_dev_boxes_by_user_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    days=days,
+                    hours=hours,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_all_dev_boxes_by_user(self, endpoint: str, user_id: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists Dev Boxes in the Dev Center for a particular user.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Display name for the Dev Box. Required.
+                    "poolName": "str",  # The name of the Dev Box pool this machine belongs to.
+                      Required.
+                    "uri": "str",  # The unique URI of the dev box. Required.
+                    "actionState": "str",  # Optional. The current action state of the Dev Box.
+                      This is state is based on previous"naction performed by user.
+                    "createdTime": "2020-02-20 00:00:00",  # Optional. Creation time of this Dev
+                      Box.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "hardwareProfile": {
+                        "memoryGB": 0,  # Optional. The amount of memory available for the
+                          Dev Box.
+                        "skuName": "str",  # Optional. The name of the SKU. Known values are:
+                          "general_i_8c32gb256ssd_v2", "general_i_8c32gb512ssd_v2",
+                          "general_i_8c32gb1024ssd_v2", "general_i_8c32gb2048ssd_v2",
+                          "general_i_16c64gb256ssd_v2", "general_i_16c64gb512ssd_v2",
+                          "general_i_16c64gb1024ssd_v2", "general_i_16c64gb2048ssd_v2",
+                          "general_i_32c128gb512ssd_v2", "general_i_32c128gb1024ssd_v2",
+                          "general_i_32c128gb2048ssd_v2", "general_a_8c32gb256ssd_v2",
+                          "general_a_8c32gb512ssd_v2", "general_a_8c32gb1024ssd_v2",
+                          "general_a_8c32gb2048ssd_v2", "general_a_16c64gb256ssd_v2",
+                          "general_a_16c64gb512ssd_v2", "general_a_16c64gb1024ssd_v2",
+                          "general_a_16c64gb2048ssd_v2", "general_a_32c128gb512ssd_v2",
+                          "general_a_32c128gb1024ssd_v2", and "general_a_32c128gb2048ssd_v2".
+                        "vCPUs": 0  # Optional. The number of vCPUs available for the Dev
+                          Box.
+                    },
+                    "hibernateSupport": "str",  # Optional. Indicates whether hibernate is
+                      enabled/disabled or unknown. Known values are: "Enabled", "Disabled", and
+                      "OsUnsupported".
+                    "imageReference": {
+                        "name": "str",  # Optional. The name of the image used.
+                        "operatingSystem": "str",  # Optional. The operating system of the
+                          image.
+                        "osBuildNumber": "str",  # Optional. The operating system build
+                          number of the image.
+                        "publishedDate": "2020-02-20 00:00:00",  # Optional. The datetime
+                          that the backing image version was published.
+                        "version": "str"  # Optional. The version of the image.
+                    },
+                    "localAdministrator": "str",  # Optional. Indicates whether the owner of the
+                      Dev Box is a local administrator. Known values are: "Enabled" and "Disabled".
+                    "location": "str",  # Optional. Azure region where this Dev Box is located.
+                      This will be the same region as the"nVirtual Network it is attached to.
+                    "osType": "str",  # Optional. The operating system type of this Dev Box.
+                      "Windows"
+                    "powerState": "str",  # Optional. The current power state of the Dev Box.
+                      Known values are: "Unknown", "Running", "Deallocated", "PoweredOff", and
+                      "Hibernated".
+                    "projectName": "str",  # Optional. Name of the project this Dev Box belongs
+                      to.
+                    "provisioningState": "str",  # Optional. The current provisioning state of
+                      the Dev Box. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Deleting", "Updating", "Starting", "Stopping", "Provisioning",
+                      "ProvisionedWithWarning", "InGracePeriod", and "NotProvisioned".
+                    "storageProfile": {
+                        "osDisk": {
+                            "diskSizeGB": 0  # Optional. The size of the OS Disk in
+                              gigabytes.
+                        }
+                    },
+                    "uniqueId": "str",  # Optional. A unique identifier for the Dev Box. This is
+                      a GUID-formatted string (e.g."n00000000-0000-0000-0000-000000000000).
+                    "user": "str"  # Optional. The AAD object id of the user this Dev Box is
+                      assigned to.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_boxes_list_all_dev_boxes_by_user_request(
+                    user_id=user_id,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+
+class DevCenterOperations:
+    """
+    .. warning::
+        **DO NOT** instantiate this class directly.
+
+        Instead, you should access the following operations through
+        :class:`~azure.developer.devcenter.aio.DevCenterClient`'s
+        :attr:`dev_center` attribute.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        input_args = list(args)
+        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
+        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
+        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
+        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
+
+    @distributed_trace
+    def list_projects(self, endpoint: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists all projects.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Name of the project. Required.
+                    "uri": "str",  # The unique URI of the project. Required.
+                    "description": "str",  # Optional. Description of the project.
+                    "displayName": "str",  # Optional. Display name of the pool.
+                    "maxDevBoxesPerUser": 0  # Optional. When specified, indicates the maximum
+                      number of Dev Boxes a single user can"ncreate across all pools in the project.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_dev_center_list_projects_request(
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace_async
+    async def get_project(self, endpoint: str, project_name: str, **kwargs: Any) -> JSON:
+        """Gets a project.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "name": "str",  # Name of the project. Required.
+                    "uri": "str",  # The unique URI of the project. Required.
+                    "description": "str",  # Optional. Description of the project.
+                    "displayName": "str",  # Optional. Display name of the pool.
+                    "maxDevBoxesPerUser": 0  # Optional. When specified, indicates the maximum
+                      number of Dev Boxes a single user can"ncreate across all pools in the project.
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_dev_center_get_project_request(
+            project_name=project_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace_async
+    async def get_project_abilities(self, endpoint: str, project_name: str, user_id: str, **kwargs: Any) -> JSON:
+        """Gets the signed-in user's permitted abilities in a project.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+           authentication context. Required.
+        :type user_id: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "abilitiesAsAdmin": [
+                        "str"  # The abilities the user has to perform actions on the project
+                          as an admin. Required.
+                    ],
+                    "abilitiesAsDeveloper": [
+                        "str"  # The abilities the user has to perform actions on the project
+                          as a developer. Required.
+                    ]
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_dev_center_get_project_abilities_request(
+            project_name=project_name,
+            user_id=user_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace_async
+    async def get_notification_settings(self, project_name: str, user_id: str = "me", **kwargs: Any) -> JSON:
+        """Gets notification settings for user in the project.
+
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Default value is "me".
+        :type user_id: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "culture": "str",  # The culture that MEO can accommdate requests to send
+                      emails in. Required.
+                    "enabled": bool,  # If notification is enabled for the user. Required.
+                    "name": "str",  # The name of the notification settings. Required. "default"
+                    "notificationType": {
+                        "devBoxProvisioningNotification": {
+                            "enabled": bool,  # If notification is enabled for DevBox
+                              provisioning. Required.
+                            "notificationChannel": {
+                                "emailNotification": {
+                                    "enabled": bool,  # If email notification is
+                                      enabled. Required.
+                                    "cc": "str",  # Optional. The cc of the email
+                                      notification.
+                                    "recipients": "str"  # Optional. The
+                                      recipients of the email notification.
+                                },
+                                "webhookNotification": {
+                                    "enabled": bool,  # If webhook notification
+                                      is enabled. Required.
+                                    "url": "str"  # Optional. The url of the
+                                      webhook.
+                                }
+                            }
+                        }
+                    }
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_dev_center_get_notification_settings_request(
+            project_name=project_name,
             user_id=user_id,
             api_version=self._config.api_version,
             headers=_headers,
@@ -4712,167 +6254,112 @@ class DevBoxesOperations:  # pylint: disable=too-many-public-methods
 
         return cast(JSON, deserialized)
 
-
-class ProjectsOperations:
-    """
-    .. warning::
-        **DO NOT** instantiate this class directly.
-
-        Instead, you should access the following operations through
-        :class:`~azure.developer.devcenter.aio.DevCenterClient`'s
-        :attr:`projects` attribute.
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        input_args = list(args)
-        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
-        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
-        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
-        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
-
-    @distributed_trace
-    def list_customization_task_definitions(
-        self, project_name: str, *, filter: Optional[str] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists all customization tasks available to the project.
+    @overload
+    async def create_notification_settings(
+        self,
+        project_name: str,
+        body: JSON,
+        user_id: str = "me",
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> JSON:
+        """Creates or updates notification settings.
 
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :param body: Represents notification settings. Required.
+        :type body: JSON
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Default value is "me".
+        :type user_id: str
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
             .. code-block:: python
 
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "culture": "str",  # The culture that MEO can accommdate requests to send
+                      emails in. Required.
+                    "enabled": bool,  # If notification is enabled for the user. Required.
+                    "name": "str",  # The name of the notification settings. Required. "default"
+                    "notificationType": {
+                        "devBoxProvisioningNotification": {
+                            "enabled": bool,  # If notification is enabled for DevBox
+                              provisioning. Required.
+                            "notificationChannel": {
+                                "emailNotification": {
+                                    "enabled": bool,  # If email notification is
+                                      enabled. Required.
+                                    "cc": "str",  # Optional. The cc of the email
+                                      notification.
+                                    "recipients": "str"  # Optional. The
+                                      recipients of the email notification.
+                                },
+                                "webhookNotification": {
+                                    "enabled": bool,  # If webhook notification
+                                      is enabled. Required.
+                                    "url": "str"  # Optional. The url of the
+                                      webhook.
+                                }
+                            }
+                        }
+                    }
+                }
+
                 # response body for status code(s): 200
                 response == {
-                    "catalogName": "str",  # Name of the catalog that the task belongs to.
-                      Required.
-                    "name": "str",  # Full name of the task: {catalogName}/{taskName}. Required.
-                    "description": "str",  # Optional. Description of the task.
-                    "parameters": {
-                        "str": {
-                            "type": "str",  # Type of the parameter. Required. Known
-                              values are: "string", "number", and "boolean".
-                            "allowed": [
-                                "str"  # Optional. Allowed values for the parameter.
-                            ],
-                            "default": "str",  # Optional. Default value for the
-                              parameter.
-                            "description": "str",  # Optional. Description of the
-                              parameter.
-                            "required": bool  # Optional. Whether or not the parameter is
-                              required.
+                    "culture": "str",  # The culture that MEO can accommdate requests to send
+                      emails in. Required.
+                    "enabled": bool,  # If notification is enabled for the user. Required.
+                    "name": "str",  # The name of the notification settings. Required. "default"
+                    "notificationType": {
+                        "devBoxProvisioningNotification": {
+                            "enabled": bool,  # If notification is enabled for DevBox
+                              provisioning. Required.
+                            "notificationChannel": {
+                                "emailNotification": {
+                                    "enabled": bool,  # If email notification is
+                                      enabled. Required.
+                                    "cc": "str",  # Optional. The cc of the email
+                                      notification.
+                                    "recipients": "str"  # Optional. The
+                                      recipients of the email notification.
+                                },
+                                "webhookNotification": {
+                                    "enabled": bool,  # If webhook notification
+                                      is enabled. Required.
+                                    "url": "str"  # Optional. The url of the
+                                      webhook.
+                                }
+                            }
                         }
-                    },
-                    "uri": "str"  # Optional. The unique URI of the customization task.
+                    }
                 }
         """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_projects_list_customization_task_definitions_request(
-                    project_name=project_name,
-                    filter=filter,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace_async
-    async def get_customization_task_definition(
-        self,
-        project_name: str,
-        catalog_name: str,
-        task_name: str,
-        *,
-        top: Optional[int] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any
+    @overload
+    async def create_notification_settings(
+        self, project_name: str, body: IO, user_id: str = "me", *, content_type: str = "application/json", **kwargs: Any
     ) -> JSON:
-        """Gets a customization task.
+        """Creates or updates notification settings.
 
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
-        :param catalog_name: The name of the catalog. Required.
-        :type catalog_name: str
-        :param task_name: A customization task name. Required.
-        :type task_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
+        :param body: Represents notification settings. Required.
+        :type body: IO
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Default value is "me".
+        :type user_id: str
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
         :return: JSON object
         :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -4882,26 +6369,116 @@ class ProjectsOperations:
 
                 # response body for status code(s): 200
                 response == {
-                    "catalogName": "str",  # Name of the catalog that the task belongs to.
-                      Required.
-                    "name": "str",  # Full name of the task: {catalogName}/{taskName}. Required.
-                    "description": "str",  # Optional. Description of the task.
-                    "parameters": {
-                        "str": {
-                            "type": "str",  # Type of the parameter. Required. Known
-                              values are: "string", "number", and "boolean".
-                            "allowed": [
-                                "str"  # Optional. Allowed values for the parameter.
-                            ],
-                            "default": "str",  # Optional. Default value for the
-                              parameter.
-                            "description": "str",  # Optional. Description of the
-                              parameter.
-                            "required": bool  # Optional. Whether or not the parameter is
-                              required.
+                    "culture": "str",  # The culture that MEO can accommdate requests to send
+                      emails in. Required.
+                    "enabled": bool,  # If notification is enabled for the user. Required.
+                    "name": "str",  # The name of the notification settings. Required. "default"
+                    "notificationType": {
+                        "devBoxProvisioningNotification": {
+                            "enabled": bool,  # If notification is enabled for DevBox
+                              provisioning. Required.
+                            "notificationChannel": {
+                                "emailNotification": {
+                                    "enabled": bool,  # If email notification is
+                                      enabled. Required.
+                                    "cc": "str",  # Optional. The cc of the email
+                                      notification.
+                                    "recipients": "str"  # Optional. The
+                                      recipients of the email notification.
+                                },
+                                "webhookNotification": {
+                                    "enabled": bool,  # If webhook notification
+                                      is enabled. Required.
+                                    "url": "str"  # Optional. The url of the
+                                      webhook.
+                                }
+                            }
                         }
-                    },
-                    "uri": "str"  # Optional. The unique URI of the customization task.
+                    }
+                }
+        """
+
+    @distributed_trace_async
+    async def create_notification_settings(
+        self, project_name: str, body: Union[JSON, IO], user_id: str = "me", **kwargs: Any
+    ) -> JSON:
+        """Creates or updates notification settings.
+
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param body: Represents notification settings. Is either a JSON type or a IO type. Required.
+        :type body: JSON or IO
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Default value is "me".
+        :type user_id: str
+        :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
+         Default value is None.
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "culture": "str",  # The culture that MEO can accommdate requests to send
+                      emails in. Required.
+                    "enabled": bool,  # If notification is enabled for the user. Required.
+                    "name": "str",  # The name of the notification settings. Required. "default"
+                    "notificationType": {
+                        "devBoxProvisioningNotification": {
+                            "enabled": bool,  # If notification is enabled for DevBox
+                              provisioning. Required.
+                            "notificationChannel": {
+                                "emailNotification": {
+                                    "enabled": bool,  # If email notification is
+                                      enabled. Required.
+                                    "cc": "str",  # Optional. The cc of the email
+                                      notification.
+                                    "recipients": "str"  # Optional. The
+                                      recipients of the email notification.
+                                },
+                                "webhookNotification": {
+                                    "enabled": bool,  # If webhook notification
+                                      is enabled. Required.
+                                    "url": "str"  # Optional. The url of the
+                                      webhook.
+                                }
+                            }
+                        }
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "culture": "str",  # The culture that MEO can accommdate requests to send
+                      emails in. Required.
+                    "enabled": bool,  # If notification is enabled for the user. Required.
+                    "name": "str",  # The name of the notification settings. Required. "default"
+                    "notificationType": {
+                        "devBoxProvisioningNotification": {
+                            "enabled": bool,  # If notification is enabled for DevBox
+                              provisioning. Required.
+                            "notificationChannel": {
+                                "emailNotification": {
+                                    "enabled": bool,  # If email notification is
+                                      enabled. Required.
+                                    "cc": "str",  # Optional. The cc of the email
+                                      notification.
+                                    "recipients": "str"  # Optional. The
+                                      recipients of the email notification.
+                                },
+                                "webhookNotification": {
+                                    "enabled": bool,  # If webhook notification
+                                      is enabled. Required.
+                                    "url": "str"  # Optional. The url of the
+                                      webhook.
+                                }
+                            }
+                        }
+                    }
                 }
         """
         error_map = {
@@ -4912,18 +6489,27 @@ class ProjectsOperations:
         }
         error_map.update(kwargs.pop("error_map", {}) or {})
 
-        _headers = kwargs.pop("headers", {}) or {}
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        request = build_projects_get_customization_task_definition_request(
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
+
+        request = build_dev_center_create_notification_settings_request(
             project_name=project_name,
-            catalog_name=catalog_name,
-            task_name=task_name,
-            top=top,
-            filter=filter,
+            user_id=user_id,
+            content_type=content_type,
             api_version=self._config.api_version,
+            json=_json,
+            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -4955,9 +6541,31 @@ class ProjectsOperations:
 
         return cast(JSON, deserialized)
 
-    async def _validate_customization_tasks_initial(
-        self, project_name: str, body: Union[JSON, IO], **kwargs: Any
+    @distributed_trace_async
+    async def list_notification_settings_allowed_cultures(
+        self, project_name: str, user_id: str = "me", **kwargs: Any
     ) -> JSON:
+        """Lists allowed culture codes for notification settings.
+
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Default value is "me".
+        :type user_id: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "value": [
+                        "str"  # Allowed culture codes for NotificationSettings. Required.
+                    ]
+                }
+        """
         error_map = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -4966,26 +6574,15 @@ class ProjectsOperations:
         }
         error_map.update(kwargs.pop("error_map", {}) or {})
 
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
         cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(body, (IOBase, bytes)):
-            _content = body
-        else:
-            _json = body
-
-        request = build_projects_validate_customization_tasks_request(
+        request = build_dev_center_list_notification_settings_allowed_cultures_request(
             project_name=project_name,
-            content_type=content_type,
+            user_id=user_id,
             api_version=self._config.api_version,
-            json=_json,
-            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -5001,14 +6598,11 @@ class ProjectsOperations:
 
         response = pipeline_response.http_response
 
-        if response.status_code not in [202]:
+        if response.status_code not in [200]:
             if _stream:
                 await response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
             raise HttpResponseError(response=response)
-
-        response_headers = {}
-        response_headers["Operation-Location"] = self._deserialize("str", response.headers.get("Operation-Location"))
 
         if response.content:
             deserialized = response.json()
@@ -5016,398 +6610,9 @@ class ProjectsOperations:
             deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)
+            return cls(pipeline_response, cast(JSON, deserialized), {})
 
         return cast(JSON, deserialized)
-
-    @overload
-    async def begin_validate_customization_tasks(
-        self, project_name: str, body: JSON, *, content_type: str = "application/json", **kwargs: Any
-    ) -> AsyncLROPoller[JSON]:
-        """Validates a list of customization tasks.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param body: Customization tasks to validate. Required.
-        :type body: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
-        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
-         for this operation to not poll, or pass in your own initialized polling object for a personal
-         polling strategy.
-        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
-        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-         Retry-After header is present.
-        :return: An instance of AsyncLROPoller that returns JSON object
-        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ]
-                }
-
-                # response body for status code(s): 202
-                response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
-                    "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
-                    },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
-                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
-                      complete.
-                    "properties": {},  # Optional. Custom operation properties, populated only
-                      for a successful operation.
-                    "resourceId": "str",  # Optional. The id of the resource.
-                    "result": {
-                        "validationResult": "str",  # Outcome of validation. Required. Known
-                          values are: "Succeeded" and "Failed".
-                        "errors": [
-                            {
-                                "details": [
-                                    {
-                                        "code": "str",  # An identifier for
-                                          the error. Codes are invariant and are intended to be
-                                          consumed programmatically. Required.
-                                        "message": "str"  # A message
-                                          describing the error, intended to be suitable for display in
-                                          a user interface. Required.
-                                    }
-                                ],
-                                "target": {
-                                    "name": "str",  # Name of the task. Required.
-                                    "displayName": "str",  # Optional. Display
-                                      name to help differentiate multiple instances of the same task.
-                                    "endTime": "2020-02-20 00:00:00",  #
-                                      Optional. End time of the task.
-                                    "id": "str",  # Optional. ID of the task
-                                      instance.
-                                    "logUri": "str",  # Optional. The unique URI
-                                      for retrieving the task logs.
-                                    "parameters": {
-                                        "str": "str"  # Optional. Parameters
-                                          for the task.
-                                    },
-                                    "runAs": "str",  # Optional. What account to
-                                      run the task as. Known values are: "System" and "User".
-                                    "startTime": "2020-02-20 00:00:00",  #
-                                      Optional. Start time of the task.
-                                    "status": "str",  # Optional. Status of the
-                                      task. Known values are: "NotStarted", "Running", "Succeeded",
-                                      "FailedValidation", "Skipped", "TimedOut", "Failed",
-                                      "WaitingForUserInputUac", and "WaitingForUserSession".
-                                    "timeout": 0  # Optional. Timeout, in
-                                      seconds. Overrides any timeout provided on the task definition.
-                                }
-                            }
-                        ]
-                    },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
-                      operation.
-                }
-        """
-
-    @overload
-    async def begin_validate_customization_tasks(
-        self, project_name: str, body: IO, *, content_type: str = "application/json", **kwargs: Any
-    ) -> AsyncLROPoller[JSON]:
-        """Validates a list of customization tasks.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param body: Customization tasks to validate. Required.
-        :type body: IO
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
-        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
-         for this operation to not poll, or pass in your own initialized polling object for a personal
-         polling strategy.
-        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
-        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-         Retry-After header is present.
-        :return: An instance of AsyncLROPoller that returns JSON object
-        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 202
-                response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
-                    "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
-                    },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
-                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
-                      complete.
-                    "properties": {},  # Optional. Custom operation properties, populated only
-                      for a successful operation.
-                    "resourceId": "str",  # Optional. The id of the resource.
-                    "result": {
-                        "validationResult": "str",  # Outcome of validation. Required. Known
-                          values are: "Succeeded" and "Failed".
-                        "errors": [
-                            {
-                                "details": [
-                                    {
-                                        "code": "str",  # An identifier for
-                                          the error. Codes are invariant and are intended to be
-                                          consumed programmatically. Required.
-                                        "message": "str"  # A message
-                                          describing the error, intended to be suitable for display in
-                                          a user interface. Required.
-                                    }
-                                ],
-                                "target": {
-                                    "name": "str",  # Name of the task. Required.
-                                    "displayName": "str",  # Optional. Display
-                                      name to help differentiate multiple instances of the same task.
-                                    "endTime": "2020-02-20 00:00:00",  #
-                                      Optional. End time of the task.
-                                    "id": "str",  # Optional. ID of the task
-                                      instance.
-                                    "logUri": "str",  # Optional. The unique URI
-                                      for retrieving the task logs.
-                                    "parameters": {
-                                        "str": "str"  # Optional. Parameters
-                                          for the task.
-                                    },
-                                    "runAs": "str",  # Optional. What account to
-                                      run the task as. Known values are: "System" and "User".
-                                    "startTime": "2020-02-20 00:00:00",  #
-                                      Optional. Start time of the task.
-                                    "status": "str",  # Optional. Status of the
-                                      task. Known values are: "NotStarted", "Running", "Succeeded",
-                                      "FailedValidation", "Skipped", "TimedOut", "Failed",
-                                      "WaitingForUserInputUac", and "WaitingForUserSession".
-                                    "timeout": 0  # Optional. Timeout, in
-                                      seconds. Overrides any timeout provided on the task definition.
-                                }
-                            }
-                        ]
-                    },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
-                      operation.
-                }
-        """
-
-    @distributed_trace_async
-    async def begin_validate_customization_tasks(
-        self, project_name: str, body: Union[JSON, IO], **kwargs: Any
-    ) -> AsyncLROPoller[JSON]:
-        """Validates a list of customization tasks.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param body: Customization tasks to validate. Is either a JSON type or a IO type. Required.
-        :type body: JSON or IO
-        :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
-         Default value is None.
-        :paramtype content_type: str
-        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
-        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
-         for this operation to not poll, or pass in your own initialized polling object for a personal
-         polling strategy.
-        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
-        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-         Retry-After header is present.
-        :return: An instance of AsyncLROPoller that returns JSON object
-        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "tasks": [
-                        {
-                            "name": "str",  # Name of the task. Required.
-                            "displayName": "str",  # Optional. Display name to help
-                              differentiate multiple instances of the same task.
-                            "endTime": "2020-02-20 00:00:00",  # Optional. End time of
-                              the task.
-                            "id": "str",  # Optional. ID of the task instance.
-                            "logUri": "str",  # Optional. The unique URI for retrieving
-                              the task logs.
-                            "parameters": {
-                                "str": "str"  # Optional. Parameters for the task.
-                            },
-                            "runAs": "str",  # Optional. What account to run the task as.
-                              Known values are: "System" and "User".
-                            "startTime": "2020-02-20 00:00:00",  # Optional. Start time
-                              of the task.
-                            "status": "str",  # Optional. Status of the task. Known
-                              values are: "NotStarted", "Running", "Succeeded", "FailedValidation",
-                              "Skipped", "TimedOut", "Failed", "WaitingForUserInputUac", and
-                              "WaitingForUserSession".
-                            "timeout": 0  # Optional. Timeout, in seconds. Overrides any
-                              timeout provided on the task definition.
-                        }
-                    ]
-                }
-
-                # response body for status code(s): 202
-                response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
-                    "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
-                    },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
-                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
-                      complete.
-                    "properties": {},  # Optional. Custom operation properties, populated only
-                      for a successful operation.
-                    "resourceId": "str",  # Optional. The id of the resource.
-                    "result": {
-                        "validationResult": "str",  # Outcome of validation. Required. Known
-                          values are: "Succeeded" and "Failed".
-                        "errors": [
-                            {
-                                "details": [
-                                    {
-                                        "code": "str",  # An identifier for
-                                          the error. Codes are invariant and are intended to be
-                                          consumed programmatically. Required.
-                                        "message": "str"  # A message
-                                          describing the error, intended to be suitable for display in
-                                          a user interface. Required.
-                                    }
-                                ],
-                                "target": {
-                                    "name": "str",  # Name of the task. Required.
-                                    "displayName": "str",  # Optional. Display
-                                      name to help differentiate multiple instances of the same task.
-                                    "endTime": "2020-02-20 00:00:00",  #
-                                      Optional. End time of the task.
-                                    "id": "str",  # Optional. ID of the task
-                                      instance.
-                                    "logUri": "str",  # Optional. The unique URI
-                                      for retrieving the task logs.
-                                    "parameters": {
-                                        "str": "str"  # Optional. Parameters
-                                          for the task.
-                                    },
-                                    "runAs": "str",  # Optional. What account to
-                                      run the task as. Known values are: "System" and "User".
-                                    "startTime": "2020-02-20 00:00:00",  #
-                                      Optional. Start time of the task.
-                                    "status": "str",  # Optional. Status of the
-                                      task. Known values are: "NotStarted", "Running", "Succeeded",
-                                      "FailedValidation", "Skipped", "TimedOut", "Failed",
-                                      "WaitingForUserInputUac", and "WaitingForUserSession".
-                                    "timeout": 0  # Optional. Timeout, in
-                                      seconds. Overrides any timeout provided on the task definition.
-                                }
-                            }
-                        ]
-                    },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
-                      operation.
-                }
-        """
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-        polling: Union[bool, AsyncPollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = await self._validate_customization_tasks_initial(
-                project_name=project_name,
-                body=body,
-                content_type=content_type,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):
-            response_headers = {}
-            response = pipeline_response.http_response
-            response_headers["Operation-Location"] = self._deserialize(
-                "str", response.headers.get("Operation-Location")
-            )
-
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-            if cls:
-                return cls(pipeline_response, deserialized, response_headers)  # type: ignore
-            return deserialized
-
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-
-        if polling is True:
-            polling_method: AsyncPollingMethod = cast(
-                AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "operation-location"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
-            )
-        elif polling is False:
-            polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return AsyncLROPoller.from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
 
 class DeploymentEnvironmentsOperations:
@@ -5428,955 +6633,13 @@ class DeploymentEnvironmentsOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list_all_environments(
-        self, project_name: str, *, top: Optional[int] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists the environments for a project.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_deployment_environments_list_all_environments_request(
-                    project_name=project_name,
-                    top=top,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace
-    def list_environments(
-        self, project_name: str, user_id: str = "me", *, top: Optional[int] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists the environments for a project and user.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_deployment_environments_list_environments_request(
-                    project_name=project_name,
-                    user_id=user_id,
-                    top=top,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace_async
-    async def get_environment(
-        self, project_name: str, environment_name: str, user_id: str = "me", **kwargs: Any
-    ) -> JSON:
-        """Gets an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_deployment_environments_get_environment_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    async def _create_or_update_environment_initial(
-        self, project_name: str, environment_name: str, body: Union[JSON, IO], user_id: str = "me", **kwargs: Any
-    ) -> JSON:
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(body, (IOBase, bytes)):
-            _content = body
-        else:
-            _json = body
-
-        request = build_deployment_environments_create_or_update_environment_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            user_id=user_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [201]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        response_headers = {}
-        response_headers["Operation-Location"] = self._deserialize("str", response.headers.get("Operation-Location"))
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)
-
-        return cast(JSON, deserialized)
-
-    @overload
-    async def begin_create_or_update_environment(
-        self,
-        project_name: str,
-        environment_name: str,
-        body: JSON,
-        user_id: str = "me",
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> AsyncLROPoller[JSON]:
-        """Creates or updates an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param body: Represents an environment. Required.
-        :type body: JSON
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
-        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
-         for this operation to not poll, or pass in your own initialized polling object for a personal
-         polling strategy.
-        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
-        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-         Retry-After header is present.
-        :return: An instance of AsyncLROPoller that returns JSON object
-        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-
-                # response body for status code(s): 201
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-
-    @overload
-    async def begin_create_or_update_environment(
-        self,
-        project_name: str,
-        environment_name: str,
-        body: IO,
-        user_id: str = "me",
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> AsyncLROPoller[JSON]:
-        """Creates or updates an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param body: Represents an environment. Required.
-        :type body: IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
-        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
-         for this operation to not poll, or pass in your own initialized polling object for a personal
-         polling strategy.
-        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
-        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-         Retry-After header is present.
-        :return: An instance of AsyncLROPoller that returns JSON object
-        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 201
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-
-    @distributed_trace_async
-    async def begin_create_or_update_environment(
-        self, project_name: str, environment_name: str, body: Union[JSON, IO], user_id: str = "me", **kwargs: Any
-    ) -> AsyncLROPoller[JSON]:
-        """Creates or updates an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param body: Represents an environment. Is either a JSON type or a IO type. Required.
-        :type body: JSON or IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
-         Default value is None.
-        :paramtype content_type: str
-        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
-        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
-         for this operation to not poll, or pass in your own initialized polling object for a personal
-         polling strategy.
-        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
-        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-         Retry-After header is present.
-        :return: An instance of AsyncLROPoller that returns JSON object
-        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-
-                # response body for status code(s): 201
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-        polling: Union[bool, AsyncPollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = await self._create_or_update_environment_initial(
-                project_name=project_name,
-                environment_name=environment_name,
-                body=body,
-                user_id=user_id,
-                content_type=content_type,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):
-            response_headers = {}
-            response = pipeline_response.http_response
-            response_headers["Operation-Location"] = self._deserialize(
-                "str", response.headers.get("Operation-Location")
-            )
-
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-            if cls:
-                return cls(pipeline_response, deserialized, response_headers)  # type: ignore
-            return deserialized
-
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-
-        if polling is True:
-            polling_method: AsyncPollingMethod = cast(
-                AsyncPollingMethod,
-                AsyncLROBasePolling(
-                    lro_delay,
-                    lro_options={"final-state-via": "original-uri"},
-                    path_format_arguments=path_format_arguments,
-                    **kwargs
-                ),
-            )
-        elif polling is False:
-            polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return AsyncLROPoller.from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    async def _delete_environment_initial(
-        self, project_name: str, environment_name: str, user_id: str = "me", **kwargs: Any
-    ) -> Optional[JSON]:
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
-
-        request = build_deployment_environments_delete_environment_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [202, 204]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        deserialized = None
-        response_headers = {}
-        if response.status_code == 202:
-            response_headers["Operation-Location"] = self._deserialize(
-                "str", response.headers.get("Operation-Location")
-            )
-
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-
-        if cls:
-            return cls(pipeline_response, deserialized, response_headers)
-
-        return deserialized
-
-    @distributed_trace_async
-    async def begin_delete_environment(
-        self, project_name: str, environment_name: str, user_id: str = "me", **kwargs: Any
-    ) -> AsyncLROPoller[JSON]:
-        """Deletes an environment and all its associated resources.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
-        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
-         for this operation to not poll, or pass in your own initialized polling object for a personal
-         polling strategy.
-        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
-        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
-         Retry-After header is present.
-        :return: An instance of AsyncLROPoller that returns JSON object
-        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 202
-                response == {
-                    "status": "str",  # Provisioning state of the resource. Required.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
-                    "error": {
-                        "code": "str",  # Optional. The error code.
-                        "message": "str"  # Optional. The error message.
-                    },
-                    "id": "str",  # Optional. Fully qualified ID for the operation status.
-                    "name": "str",  # Optional. The operation id name.
-                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
-                      complete.
-                    "properties": {},  # Optional. Custom operation properties, populated only
-                      for a successful operation.
-                    "resourceId": "str",  # Optional. The id of the resource.
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
-                      operation.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-        polling: Union[bool, AsyncPollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = await self._delete_environment_initial(
-                project_name=project_name,
-                environment_name=environment_name,
-                user_id=user_id,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):
-            response_headers = {}
-            response = pipeline_response.http_response
-            response_headers["Operation-Location"] = self._deserialize(
-                "str", response.headers.get("Operation-Location")
-            )
-
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-            if cls:
-                return cls(pipeline_response, deserialized, response_headers)  # type: ignore
-            return deserialized
-
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-
-        if polling is True:
-            polling_method: AsyncPollingMethod = cast(
-                AsyncPollingMethod,
-                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
-            )
-        elif polling is False:
-            polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return AsyncLROPoller.from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    @distributed_trace
-    def list_catalogs(self, project_name: str, *, top: Optional[int] = None, **kwargs: Any) -> AsyncIterable[JSON]:
+    def list_catalogs(self, endpoint: str, project_name: str, **kwargs: Any) -> AsyncIterable[JSON]:
         """Lists all of the catalogs available for a project.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -6408,15 +6671,12 @@ class DeploymentEnvironmentsOperations:
 
                 request = build_deployment_environments_list_catalogs_request(
                     project_name=project_name,
-                    top=top,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -6434,9 +6694,7 @@ class DeploymentEnvironmentsOperations:
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -6469,12 +6727,14 @@ class DeploymentEnvironmentsOperations:
         return AsyncItemPaged(get_next, extract_data)
 
     @distributed_trace_async
-    async def get_catalog(self, project_name: str, catalog_name: str, **kwargs: Any) -> JSON:
+    async def get_catalog(self, endpoint: str, project_name: str, catalog_name: str, **kwargs: Any) -> JSON:
         """Gets the specified catalog within the project.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param catalog_name: The name of the catalog. Required.
+        :param catalog_name: Name of the catalog. Required.
         :type catalog_name: str
         :return: JSON object
         :rtype: JSON
@@ -6510,7 +6770,7 @@ class DeploymentEnvironmentsOperations:
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -6538,148 +6798,17 @@ class DeploymentEnvironmentsOperations:
         return cast(JSON, deserialized)
 
     @distributed_trace
-    def list_environment_definitions(
-        self, project_name: str, *, top: Optional[int] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists all environment definitions available for a project.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "catalogName": "str",  # Name of the catalog. Required.
-                    "id": "str",  # The ID of the environment definition. Required.
-                    "name": "str",  # Name of the environment definition. Required.
-                    "uri": "str",  # The unique URI of the environment definition. Required.
-                    "description": "str",  # Optional. A short description of the environment
-                      definition.
-                    "parameters": [
-                        {
-                            "id": "str",  # Unique ID of the parameter. Required.
-                            "required": bool,  # Whether or not this parameter is
-                              required. Required.
-                            "type": "str",  # A string of one of the basic JSON types
-                              (number, integer, array, object, boolean, string). Required. Known values
-                              are: "array", "boolean", "integer", "number", "object", and "string".
-                            "allowed": [
-                                "str"  # Optional. An array of allowed values.
-                            ],
-                            "default": "str",  # Optional. Default value of the
-                              parameter.
-                            "description": "str",  # Optional. Description of the
-                              parameter.
-                            "name": "str",  # Optional. Display name of the parameter.
-                            "readOnly": bool  # Optional. Whether or not this parameter
-                              is read-only.  If true, default should have a value.
-                        }
-                    ],
-                    "parametersSchema": "str",  # Optional. JSON schema defining the parameters
-                      object passed to an environment.
-                    "templatePath": "str"  # Optional. Path to the Environment Definition
-                      entrypoint file.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_deployment_environments_list_environment_definitions_request(
-                    project_name=project_name,
-                    top=top,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace
     def list_environment_definitions_by_catalog(
-        self, project_name: str, catalog_name: str, *, top: Optional[int] = None, **kwargs: Any
+        self, endpoint: str, project_name: str, catalog_name: str, **kwargs: Any
     ) -> AsyncIterable[JSON]:
         """Lists all environment definitions available within a catalog.
 
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
         :param catalog_name: The name of the catalog. Required.
         :type catalog_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -6701,8 +6830,9 @@ class DeploymentEnvironmentsOperations:
                             "required": bool,  # Whether or not this parameter is
                               required. Required.
                             "type": "str",  # A string of one of the basic JSON types
-                              (number, integer, array, object, boolean, string). Required. Known values
-                              are: "array", "boolean", "integer", "number", "object", and "string".
+                              (number, integer, array, object,"nboolean, string). Required. Known
+                              values are: "array", "boolean", "integer", "number", "object", and
+                              "string".
                             "allowed": [
                                 "str"  # Optional. An array of allowed values.
                             ],
@@ -6712,7 +6842,7 @@ class DeploymentEnvironmentsOperations:
                               parameter.
                             "name": "str",  # Optional. Display name of the parameter.
                             "readOnly": bool  # Optional. Whether or not this parameter
-                              is read-only.  If true, default should have a value.
+                              is read-only.  If true, default should have a"nvalue.
                         }
                     ],
                     "parametersSchema": "str",  # Optional. JSON schema defining the parameters
@@ -6740,15 +6870,12 @@ class DeploymentEnvironmentsOperations:
                 request = build_deployment_environments_list_environment_definitions_by_catalog_request(
                     project_name=project_name,
                     catalog_name=catalog_name,
-                    top=top,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -6766,9 +6893,7 @@ class DeploymentEnvironmentsOperations:
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -6802,15 +6927,17 @@ class DeploymentEnvironmentsOperations:
 
     @distributed_trace_async
     async def get_environment_definition(
-        self, project_name: str, catalog_name: str, definition_name: str, **kwargs: Any
+        self, endpoint: str, project_name: str, catalog_name: str, definition_name: str, **kwargs: Any
     ) -> JSON:
         """Get an environment definition from a catalog.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param catalog_name: The name of the catalog. Required.
+        :param catalog_name: Name of the catalog. Required.
         :type catalog_name: str
-        :param definition_name: The name of the environment definition. Required.
+        :param definition_name: Name of the environment definition. Required.
         :type definition_name: str
         :return: JSON object
         :rtype: JSON
@@ -6833,8 +6960,9 @@ class DeploymentEnvironmentsOperations:
                             "required": bool,  # Whether or not this parameter is
                               required. Required.
                             "type": "str",  # A string of one of the basic JSON types
-                              (number, integer, array, object, boolean, string). Required. Known values
-                              are: "array", "boolean", "integer", "number", "object", and "string".
+                              (number, integer, array, object,"nboolean, string). Required. Known
+                              values are: "array", "boolean", "integer", "number", "object", and
+                              "string".
                             "allowed": [
                                 "str"  # Optional. An array of allowed values.
                             ],
@@ -6844,7 +6972,7 @@ class DeploymentEnvironmentsOperations:
                               parameter.
                             "name": "str",  # Optional. Display name of the parameter.
                             "readOnly": bool  # Optional. Whether or not this parameter
-                              is read-only.  If true, default should have a value.
+                              is read-only.  If true, default should have a"nvalue.
                         }
                     ],
                     "parametersSchema": "str",  # Optional. JSON schema defining the parameters
@@ -6875,7 +7003,7 @@ class DeploymentEnvironmentsOperations:
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -6903,16 +7031,13 @@ class DeploymentEnvironmentsOperations:
         return cast(JSON, deserialized)
 
     @distributed_trace
-    def list_environment_types(
-        self, project_name: str, *, top: Optional[int] = None, **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists all environment types configured for a project.
+    def list_environment_definitions(self, endpoint: str, project_name: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists all environment definitions available for a project.
 
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -6922,9 +7047,132 @@ class DeploymentEnvironmentsOperations:
 
                 # response body for status code(s): 200
                 response == {
-                    "deploymentTargetId": "str",  # The ID of a subscription or management group
-                      that the environment type will be mapped to. The environment's resources will be
-                      deployed into this subscription or management group. Required.
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "id": "str",  # The ID of the environment definition. Required.
+                    "name": "str",  # Name of the environment definition. Required.
+                    "uri": "str",  # The unique URI of the environment definition. Required.
+                    "description": "str",  # Optional. A short description of the environment
+                      definition.
+                    "parameters": [
+                        {
+                            "id": "str",  # Unique ID of the parameter. Required.
+                            "required": bool,  # Whether or not this parameter is
+                              required. Required.
+                            "type": "str",  # A string of one of the basic JSON types
+                              (number, integer, array, object,"nboolean, string). Required. Known
+                              values are: "array", "boolean", "integer", "number", "object", and
+                              "string".
+                            "allowed": [
+                                "str"  # Optional. An array of allowed values.
+                            ],
+                            "default": "str",  # Optional. Default value of the
+                              parameter.
+                            "description": "str",  # Optional. Description of the
+                              parameter.
+                            "name": "str",  # Optional. Display name of the parameter.
+                            "readOnly": bool  # Optional. Whether or not this parameter
+                              is read-only.  If true, default should have a"nvalue.
+                        }
+                    ],
+                    "parametersSchema": "str",  # Optional. JSON schema defining the parameters
+                      object passed to an environment.
+                    "templatePath": "str"  # Optional. Path to the Environment Definition
+                      entrypoint file.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_deployment_environments_list_environment_definitions_request(
+                    project_name=project_name,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_environment_types(self, endpoint: str, project_name: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists all environment types configured for a project.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "deploymentTargetId": "str",  # Id of a subscription or management group that
+                      the environment type will be"nmapped to. The environment's resources will be
+                      deployed into this subscription"nor management group. Required.
                     "name": "str",  # Name of the environment type. Required.
                     "status": "str",  # Indicates whether this environment type is enabled for
                       use in this project. Required. Known values are: "Enabled" and "Disabled".
@@ -6950,15 +7198,12 @@ class DeploymentEnvironmentsOperations:
 
                 request = build_deployment_environments_list_environment_types_request(
                     project_name=project_name,
-                    top=top,
                     api_version=self._config.api_version,
                     headers=_headers,
                     params=_params,
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -6976,9 +7221,7 @@ class DeploymentEnvironmentsOperations:
                     "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
                 )
                 path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
                 }
                 request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -7009,6 +7252,1006 @@ class DeploymentEnvironmentsOperations:
             return pipeline_response
 
         return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_all_environments(self, endpoint: str, project_name: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists the environments for a project.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_deployment_environments_list_all_environments_request(
+                    project_name=project_name,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_environments(self, endpoint: str, project_name: str, user_id: str, **kwargs: Any) -> AsyncIterable[JSON]:
+        """Lists the environments for a project and user.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_deployment_environments_list_environments_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace_async
+    async def get_environment(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, **kwargs: Any
+    ) -> JSON:
+        """Gets an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: Environment name. Required.
+        :type environment_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_deployment_environments_get_environment_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    async def _create_or_update_environment_initial(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        body: Union[JSON, IO],
+        **kwargs: Any
+    ) -> JSON:
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
+
+        request = build_deployment_environments_create_or_update_environment_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [201]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        response_headers = {}
+        response_headers["Operation-Location"] = self._deserialize("str", response.headers.get("Operation-Location"))
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), response_headers)
+
+        return cast(JSON, deserialized)
+
+    @overload
+    async def begin_create_or_update_environment(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> AsyncLROPoller[JSON]:
+        """Creates or updates an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param body: Represents an environment. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
+        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
+         for this operation to not poll, or pass in your own initialized polling object for a personal
+         polling strategy.
+        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
+        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
+         Retry-After header is present.
+        :return: An instance of AsyncLROPoller that returns JSON object
+        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+
+                # response body for status code(s): 201
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+
+    @overload
+    async def begin_create_or_update_environment(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        body: IO,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> AsyncLROPoller[JSON]:
+        """Creates or updates an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param body: Represents an environment. Required.
+        :type body: IO
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
+        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
+         for this operation to not poll, or pass in your own initialized polling object for a personal
+         polling strategy.
+        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
+        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
+         Retry-After header is present.
+        :return: An instance of AsyncLROPoller that returns JSON object
+        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 201
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+
+    @distributed_trace_async
+    async def begin_create_or_update_environment(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        body: Union[JSON, IO],
+        **kwargs: Any
+    ) -> AsyncLROPoller[JSON]:
+        """Creates or updates an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param body: Represents an environment. Is either a JSON type or a IO type. Required.
+        :type body: JSON or IO
+        :keyword content_type: Body Parameter content-type. Known values are: 'application/json'.
+         Default value is None.
+        :paramtype content_type: str
+        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
+        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
+         for this operation to not poll, or pass in your own initialized polling object for a personal
+         polling strategy.
+        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
+        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
+         Retry-After header is present.
+        :return: An instance of AsyncLROPoller that returns JSON object
+        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+
+                # response body for status code(s): 201
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        polling: Union[bool, AsyncPollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = await self._create_or_update_environment_initial(
+                endpoint=endpoint,
+                project_name=project_name,
+                user_id=user_id,
+                environment_name=environment_name,
+                body=body,
+                content_type=content_type,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):
+            response_headers = {}
+            response = pipeline_response.http_response
+            response_headers["Operation-Location"] = self._deserialize(
+                "str", response.headers.get("Operation-Location")
+            )
+
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+            if cls:
+                return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return deserialized
+
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+
+        if polling is True:
+            polling_method: AsyncPollingMethod = cast(
+                AsyncPollingMethod,
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
+            )
+        elif polling is False:
+            polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return AsyncLROPoller.from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    async def _delete_environment_initial(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, **kwargs: Any
+    ) -> Optional[JSON]:
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
+
+        request = build_deployment_environments_delete_environment_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [202, 204]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        deserialized = None
+        response_headers = {}
+        if response.status_code == 202:
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Operation-Location"] = self._deserialize(
+                "str", response.headers.get("Operation-Location")
+            )
+
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if cls:
+            return cls(pipeline_response, deserialized, response_headers)
+
+        return deserialized
+
+    @distributed_trace_async
+    async def begin_delete_environment(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, **kwargs: Any
+    ) -> AsyncLROPoller[JSON]:
+        """Deletes an environment and all its associated resources.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :keyword str continuation_token: A continuation token to restart a poller from a saved state.
+        :keyword polling: By default, your polling method will be AsyncLROBasePolling. Pass in False
+         for this operation to not poll, or pass in your own initialized polling object for a personal
+         polling strategy.
+        :paramtype polling: bool or ~azure.core.polling.AsyncPollingMethod
+        :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
+         Retry-After header is present.
+        :return: An instance of AsyncLROPoller that returns JSON object
+        :rtype: ~azure.core.polling.AsyncLROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 202
+                response == {
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
+                      complete.
+                    "properties": {},  # Optional. Custom operation properties, populated only
+                      for a successful operation.
+                    "resourceId": "str",  # Optional. The id of the resource.
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
+                      operation.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        polling: Union[bool, AsyncPollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = await self._delete_environment_initial(
+                endpoint=endpoint,
+                project_name=project_name,
+                user_id=user_id,
+                environment_name=environment_name,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):
+            response_headers = {}
+            response = pipeline_response.http_response
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Operation-Location"] = self._deserialize(
+                "str", response.headers.get("Operation-Location")
+            )
+
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+            if cls:
+                return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+            return deserialized
+
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+
+        if polling is True:
+            polling_method: AsyncPollingMethod = cast(
+                AsyncPollingMethod,
+                AsyncLROBasePolling(lro_delay, path_format_arguments=path_format_arguments, **kwargs),
+            )
+        elif polling is False:
+            polling_method = cast(AsyncPollingMethod, AsyncNoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return AsyncLROPoller.from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return AsyncLROPoller(self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
 
 class EnvironmentsOperations:
@@ -7028,1158 +8271,18 @@ class EnvironmentsOperations:
         self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
-    @overload
-    async def patch_environment(
-        self,
-        project_name: str,
-        environment_name: str,
-        body: JSON,
-        user_id: str = "me",
-        *,
-        content_type: str = "application/merge-patch+json",
-        **kwargs: Any
-    ) -> JSON:
-        """Partially updates an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param body: Updatable environment properties. Required.
-        :type body: JSON
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/merge-patch+json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-
-    @overload
-    async def patch_environment(
-        self,
-        project_name: str,
-        environment_name: str,
-        body: IO,
-        user_id: str = "me",
-        *,
-        content_type: str = "application/merge-patch+json",
-        **kwargs: Any
-    ) -> JSON:
-        """Partially updates an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param body: Updatable environment properties. Required.
-        :type body: IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/merge-patch+json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-
     @distributed_trace_async
-    async def patch_environment(
-        self, project_name: str, environment_name: str, body: Union[JSON, IO], user_id: str = "me", **kwargs: Any
-    ) -> JSON:
-        """Partially updates an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param body: Updatable environment properties. Is either a JSON type or a IO type. Required.
-        :type body: JSON or IO
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword content_type: Body Parameter content-type. Known values are:
-         'application/merge-patch+json'. Default value is None.
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "catalogName": "str",  # The name of the catalog. Cannot be updated after
-                      creation. Required.
-                    "environmentDefinitionName": "str",  # The name of the environment
-                      definition. Cannot be updated after creation. Required.
-                    "environmentType": "str",  # The name of the environment type. Cannot be
-                      updated after creation. Required.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
-                      date will be triggered (UTC), after which the environment and associated
-                      resources will be deleted.
-                    "name": "str",  # Optional. Environment name.
-                    "parameters": {},  # Optional. Parameters object for the environment. Can
-                      only be updated via create or replace.
-                    "provisioningState": "str",  # Optional. The provisioning state of the
-                      environment.
-                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
-                      containing the environment's resources.
-                    "uri": "str",  # Optional. The unique URI of the environment.
-                    "user": "str"  # Optional. The AAD object id of the owner of this
-                      Environment.
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/merge-patch+json"
-        _json = None
-        _content = None
-        if isinstance(body, (IOBase, bytes)):
-            _content = body
-        else:
-            _json = body
-
-        request = build_environments_patch_environment_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            user_id=user_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @distributed_trace_async
-    async def get_outputs(self, project_name: str, environment_name: str, user_id: str = "me", **kwargs: Any) -> JSON:
-        """Gets Outputs from the environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "outputs": {
-                        "str": {
-                            "sensitive": bool,  # Optional. Indicates if the value is
-                              sensitive.
-                            "type": "str",  # Optional. Type of the output value. Known
-                              values are: "array", "boolean", "number", "object", and "string".
-                            "value": {}  # Optional. The output value.
-                        }
-                    }
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_environments_get_outputs_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @distributed_trace
-    def list_operations(
-        self,
-        project_name: str,
-        environment_name: str,
-        user_id: str = "me",
-        *,
-        top: Optional[int] = None,
-        filter: Optional[str] = None,
-        **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Lists operations on the environment which have occurred within the past 90 days.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
-        :keyword filter: An OData filter clause to apply to the operation. Default value is None.
-        :paramtype filter: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-                # The response is polymorphic. The following are possible polymorphic responses based
-                  off discriminator "kind":
-
-                # JSON input template for discriminator value "Delete":
-                environment_operation = {
-                    "kind": "Delete",
-                    "operationId": "str",  # Unique identifier for the environment operation.
-                      Required.
-                    "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
-                    "uri": "str",  # The unique URI for the environment operation. Required.
-                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
-                      initiated the operation.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
-                      finished.
-                    "environmentParameters": {},  # Optional. Parameters object for the
-                      environment at the time of the operation.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
-                      started.
-                }
-
-                # JSON input template for discriminator value "Deploy":
-                environment_operation = {
-                    "kind": "Deploy",
-                    "operationId": "str",  # Unique identifier for the environment operation.
-                      Required.
-                    "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
-                    "uri": "str",  # The unique URI for the environment operation. Required.
-                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
-                      initiated the operation.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
-                      finished.
-                    "environmentParameters": {},  # Optional. Parameters object for the
-                      environment at the time of the operation.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
-                      started.
-                }
-
-                # response body for status code(s): 200
-                response == environment_operation
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_environments_list_operations_request(
-                    project_name=project_name,
-                    environment_name=environment_name,
-                    user_id=user_id,
-                    top=top,
-                    filter=filter,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace_async
-    async def get_operation(
-        self, project_name: str, environment_name: str, operation_id: str, user_id: str = "me", **kwargs: Any
-    ) -> JSON:
-        """Gets an environment action result.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param operation_id: The id of the operation on an environment. Required.
-        :type operation_id: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-                # The response is polymorphic. The following are possible polymorphic responses based
-                  off discriminator "kind":
-
-                # JSON input template for discriminator value "Delete":
-                environment_operation = {
-                    "kind": "Delete",
-                    "operationId": "str",  # Unique identifier for the environment operation.
-                      Required.
-                    "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
-                    "uri": "str",  # The unique URI for the environment operation. Required.
-                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
-                      initiated the operation.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
-                      finished.
-                    "environmentParameters": {},  # Optional. Parameters object for the
-                      environment at the time of the operation.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
-                      started.
-                }
-
-                # JSON input template for discriminator value "Deploy":
-                environment_operation = {
-                    "kind": "Deploy",
-                    "operationId": "str",  # Unique identifier for the environment operation.
-                      Required.
-                    "status": "str",  # The operation status. Required. Known values are:
-                      "NotStarted", "Running", "Succeeded", "Canceled", and "Failed".
-                    "uri": "str",  # The unique URI for the environment operation. Required.
-                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
-                      initiated the operation.
-                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
-                      finished.
-                    "environmentParameters": {},  # Optional. Parameters object for the
-                      environment at the time of the operation.
-                    "error": {
-                        "code": "str",  # An identifier for the error. Codes are invariant
-                          and are intended to be consumed programmatically. Required.
-                        "message": "str",  # A message describing the error, intended to be
-                          suitable for display in a user interface. Required.
-                        "details": [
-                            ...
-                        ],
-                        "target": "str"  # Optional. The target of the particular error. For
-                          example, the name of the property in error.
-                    },
-                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
-                      started.
-                }
-
-                # response body for status code(s): 200
-                response == environment_operation
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_environments_get_operation_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            operation_id=operation_id,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @distributed_trace_async
-    async def get_logs_by_operation(
-        self, project_name: str, environment_name: str, operation_id: str, user_id: str = "me", **kwargs: Any
-    ) -> AsyncIterator[bytes]:
-        """Gets the logs for an operation on an environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param operation_id: The id of the operation on an environment. Required.
-        :type operation_id: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: Async iterator of the response bytes
-        :rtype: AsyncIterator[bytes]
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[AsyncIterator[bytes]] = kwargs.pop("cls", None)
-
-        request = build_environments_get_logs_by_operation_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            operation_id=operation_id,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = True
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        deserialized = response.iter_bytes()
-
-        if cls:
-            return cls(pipeline_response, cast(AsyncIterator[bytes], deserialized), {})
-
-        return cast(AsyncIterator[bytes], deserialized)
-
-    @distributed_trace
-    def list_actions(
-        self, project_name: str, environment_name: str, user_id: str = "me", **kwargs: Any
-    ) -> AsyncIterable[JSON]:
-        """Get all scheduled actions for a user within an  environment.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "actionType": "str",  # The action that will be taken. Required. "Delete"
-                    "next": {
-                        "scheduledTime": "2020-02-20 00:00:00"  # The time the action will be
-                          triggered (UTC). Required.
-                    },
-                    "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. time the object was
-                      last modified.
-                    "lastModifiedBy": "str",  # Optional. Object Id of the user who last modified
-                      the action.
-                    "name": "str",  # Optional. Uniquely identifies the action.
-                    "uri": "str"  # Optional. Uri of the action resource.
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                request = build_environments_list_actions_request(
-                    project_name=project_name,
-                    environment_name=environment_name,
-                    user_id=user_id,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                path_format_arguments = {
-                    "endpoint": self._serialize.url(
-                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
-                    ),
-                }
-                request.url = self._client.format_url(request.url, **path_format_arguments)
-
-            return request
-
-        async def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
-
-        async def get_next(next_link=None):
-            request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-                request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    await response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
-
-            return pipeline_response
-
-        return AsyncItemPaged(get_next, extract_data)
-
-    @distributed_trace_async
-    async def get_action(
-        self, project_name: str, environment_name: str, action_name: str, user_id: str = "me", **kwargs: Any
-    ) -> JSON:
-        """Retrieve a specific environment action.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param action_name: The name of an action that will take place on an Environment. Required.
-        :type action_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "actionType": "str",  # The action that will be taken. Required. "Delete"
-                    "next": {
-                        "scheduledTime": "2020-02-20 00:00:00"  # The time the action will be
-                          triggered (UTC). Required.
-                    },
-                    "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. time the object was
-                      last modified.
-                    "lastModifiedBy": "str",  # Optional. Object Id of the user who last modified
-                      the action.
-                    "name": "str",  # Optional. Uniquely identifies the action.
-                    "uri": "str"  # Optional. Uri of the action resource.
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_environments_get_action_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            action_name=action_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @distributed_trace_async
-    async def skip_action(  # pylint: disable=inconsistent-return-statements
-        self, project_name: str, environment_name: str, action_name: str, user_id: str = "me", **kwargs: Any
-    ) -> None:
-        """Skips an occurrence of an action.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param action_name: The name of an action that will take place on an Environment. Required.
-        :type action_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :return: None
-        :rtype: None
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-
-        request = build_environments_skip_action_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            action_name=action_name,
-            user_id=user_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [204]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if cls:
-            return cls(pipeline_response, None, {})
-
-    @distributed_trace_async
-    async def delay_action(
-        self,
-        project_name: str,
-        environment_name: str,
-        action_name: str,
-        user_id: str = "me",
-        *,
-        until: datetime.datetime,
-        **kwargs: Any
-    ) -> JSON:
-        """Delays the occurrence of an action.
-
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
-        :type project_name: str
-        :param environment_name: The name of the environment. Required.
-        :type environment_name: str
-        :param action_name: The name of an action that will take place on an Environment. Required.
-        :type action_name: str
-        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
-        :type user_id: str
-        :keyword until: The time to delay the Environment action until. Required.
-        :paramtype until: ~datetime.datetime
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "actionType": "str",  # The action that will be taken. Required. "Delete"
-                    "next": {
-                        "scheduledTime": "2020-02-20 00:00:00"  # The time the action will be
-                          triggered (UTC). Required.
-                    },
-                    "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. time the object was
-                      last modified.
-                    "lastModifiedBy": "str",  # Optional. Object Id of the user who last modified
-                      the action.
-                    "name": "str",  # Optional. Uniquely identifies the action.
-                    "uri": "str"  # Optional. Uri of the action resource.
-                }
-        """
-        error_map = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        request = build_environments_delay_action_request(
-            project_name=project_name,
-            environment_name=environment_name,
-            action_name=action_name,
-            user_id=user_id,
-            until=until,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
-        }
-        request.url = self._client.format_url(request.url, **path_format_arguments)
-
-        _stream = False
-        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
-            request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                await response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})
-
-        return cast(JSON, deserialized)
-
-    @distributed_trace_async
-    async def get_environment_type(
-        self, project_name: str, environment_type_name: str, *, top: Optional[int] = None, **kwargs: Any
+    async def get_environment_types(
+        self, endpoint: str, project_name: str, environment_type_name: str, **kwargs: Any
     ) -> JSON:
         """Get an environment type configured for a project.
 
-        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
         :type project_name: str
-        :param environment_type_name: The name of the environment type. Required.
+        :param environment_type_name: Name of the environment type. Required.
         :type environment_type_name: str
-        :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
-         Default value is None.
-        :paramtype top: int
         :return: JSON object
         :rtype: JSON
         :raises ~azure.core.exceptions.HttpResponseError:
@@ -8189,9 +8292,9 @@ class EnvironmentsOperations:
 
                 # response body for status code(s): 200
                 response == {
-                    "deploymentTargetId": "str",  # The ID of a subscription or management group
-                      that the environment type will be mapped to. The environment's resources will be
-                      deployed into this subscription or management group. Required.
+                    "deploymentTargetId": "str",  # Id of a subscription or management group that
+                      the environment type will be"nmapped to. The environment's resources will be
+                      deployed into this subscription"nor management group. Required.
                     "name": "str",  # Name of the environment type. Required.
                     "status": "str",  # Indicates whether this environment type is enabled for
                       use in this project. Required. Known values are: "Enabled" and "Disabled".
@@ -8212,16 +8315,15 @@ class EnvironmentsOperations:
 
         cls: ClsType[JSON] = kwargs.pop("cls", None)
 
-        request = build_environments_get_environment_type_request(
+        request = build_environments_get_environment_types_request(
             project_name=project_name,
             environment_type_name=environment_type_name,
-            top=top,
             api_version=self._config.api_version,
             headers=_headers,
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 
@@ -8251,21 +8353,24 @@ class EnvironmentsOperations:
     @distributed_trace_async
     async def get_environment_type_abilities(
         self,
+        endpoint: str,
         project_name: str,
         environment_type_name: str,
-        user_id: str = "me",
+        user_id: str,
         *,
         top: Optional[int] = None,
         **kwargs: Any
     ) -> JSON:
         """Gets the signed-in user's permitted abilities in an environment type.
 
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
         :param project_name: The DevCenter Project upon which to execute operations. Required.
         :type project_name: str
         :param environment_type_name: The name of the environment type. Required.
         :type environment_type_name: str
         :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
-         authentication context. Default value is "me".
+           authentication context. Required.
         :type user_id: str
         :keyword top: The maximum number of resources to return from the operation. Example: 'top=10'.
          Default value is None.
@@ -8312,7 +8417,1496 @@ class EnvironmentsOperations:
             params=_params,
         )
         path_format_arguments = {
-            "endpoint": self._serialize.url("self._config.endpoint", self._config.endpoint, "str", skip_quote=True),
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @overload
+    async def patch_environment(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        body: JSON,
+        *,
+        content_type: str = "application/merge-patch+json",
+        **kwargs: Any
+    ) -> JSON:
+        """Partially updates an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param body: Represents an environment. Required.
+        :type body: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/merge-patch+json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+
+    @overload
+    async def patch_environment(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        body: IO,
+        *,
+        content_type: str = "application/merge-patch+json",
+        **kwargs: Any
+    ) -> JSON:
+        """Partially updates an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param body: Represents an environment. Required.
+        :type body: IO
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/merge-patch+json".
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+
+    @distributed_trace_async
+    async def patch_environment(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        body: Union[JSON, IO],
+        **kwargs: Any
+    ) -> JSON:
+        """Partially updates an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param body: Represents an environment. Is either a JSON type or a IO type. Required.
+        :type body: JSON or IO
+        :keyword content_type: Body Parameter content-type. Known values are:
+         'application/merge-patch+json'. Default value is None.
+        :paramtype content_type: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                body = {
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "catalogName": "str",  # Name of the catalog. Required.
+                    "environmentDefinitionName": "str",  # Name of the environment definition.
+                      Required.
+                    "environmentType": "str",  # Environment type. Required.
+                    "name": "str",  # Environment name. Required.
+                    "uri": "str",  # The unique URI of the environment. Required.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "expirationDate": "2020-02-20 00:00:00",  # Optional. The time the expiration
+                      date will be triggered (UTC), after which the"nenvironment and associated
+                      resources will be deleted.
+                    "parameters": {
+                        "str": {}  # Optional. Parameters object for the environment.
+                    },
+                    "provisioningState": "str",  # Optional. The provisioning state of the
+                      environment. Known values are: "Succeeded", "Failed", "Canceled", "Creating",
+                      "Accepted", "Deleting", "Updating", "Preparing", "Running", "Syncing",
+                      "MovingResources", "TransientFailure", and "StorageProvisioningFailed".
+                    "resourceGroupId": "str",  # Optional. The identifier of the resource group
+                      containing the environment's resources.
+                    "user": "str"  # Optional. The AAD object id of the owner of this
+                      Environment.
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/merge-patch+json"
+        _json = None
+        _content = None
+        if isinstance(body, (IOBase, bytes)):
+            _content = body
+        else:
+            _json = body
+
+        request = build_environments_patch_environment_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace
+    def list_actions(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Get all scheduled actions for a user within an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: Environment name. Required.
+        :type environment_name: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "actionType": "str",  # The action that will be taken. Required. "Delete"
+                    "name": "str",  # Uniquely identifies the action. Required.
+                    "uri": "str",  # Uri of the action resource. Required.
+                    "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. Time the object was
+                      last modified.
+                    "lastModifiedBy": "str",  # Optional. Object Id of the user who last modified
+                      the action.
+                    "next": {
+                        "scheduledTime": "2020-02-20 00:00:00"  # Optional. The time the
+                          action will be triggered (UTC).
+                    }
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_environments_list_actions_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    environment_name=environment_name,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace_async
+    async def get_action(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, action_name: str, **kwargs: Any
+    ) -> JSON:
+        """Retrieve a specific environment action.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: Environment name. Required.
+        :type environment_name: str
+        :param action_name: Uniquely identifies the action. Required.
+        :type action_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "actionType": "str",  # The action that will be taken. Required. "Delete"
+                    "name": "str",  # Uniquely identifies the action. Required.
+                    "uri": "str",  # Uri of the action resource. Required.
+                    "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. Time the object was
+                      last modified.
+                    "lastModifiedBy": "str",  # Optional. Object Id of the user who last modified
+                      the action.
+                    "next": {
+                        "scheduledTime": "2020-02-20 00:00:00"  # Optional. The time the
+                          action will be triggered (UTC).
+                    }
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_environments_get_action_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            action_name=action_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace_async
+    async def skip_action(  # pylint: disable=inconsistent-return-statements
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, action_name: str, **kwargs: Any
+    ) -> None:
+        """Skips an occurrence of an action.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: Environment name. Required.
+        :type environment_name: str
+        :param action_name: Uniquely identifies the action. Required.
+        :type action_name: str
+        :return: None
+        :rtype: None
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[None] = kwargs.pop("cls", None)
+
+        request = build_environments_skip_action_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            action_name=action_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [204]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if cls:
+            return cls(pipeline_response, None, {})
+
+    @distributed_trace_async
+    async def delay_action(
+        self,
+        endpoint: str,
+        project_name: str,
+        user_id: str,
+        environment_name: str,
+        action_name: str,
+        *,
+        until: datetime.datetime,
+        **kwargs: Any
+    ) -> JSON:
+        """Delays the occurrence of an action.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: Environment name. Required.
+        :type environment_name: str
+        :param action_name: Uniquely identifies the action. Required.
+        :type action_name: str
+        :keyword until: The time to delay the Environment action until. Required.
+        :paramtype until: ~datetime.datetime
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "actionType": "str",  # The action that will be taken. Required. "Delete"
+                    "name": "str",  # Uniquely identifies the action. Required.
+                    "uri": "str",  # Uri of the action resource. Required.
+                    "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. Time the object was
+                      last modified.
+                    "lastModifiedBy": "str",  # Optional. Object Id of the user who last modified
+                      the action.
+                    "next": {
+                        "scheduledTime": "2020-02-20 00:00:00"  # Optional. The time the
+                          action will be triggered (UTC).
+                    }
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_environments_delay_action_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            action_name=action_name,
+            until=until,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace
+    def list_operations(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Lists operations on the environment which have occurred within the past 90 days.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: Environment name. Required.
+        :type environment_name: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "kind":
+
+                # JSON input template for discriminator value "Delete":
+                environment_operation = {
+                    "kind": "Delete",
+                    "operationId": "str",  # Unique identifier for the environment operation.
+                      Required.
+                    "status": "str",  # The operation status. Required. Known values are:
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "uri": "str",  # The unique URI for the environment operation. Required.
+                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
+                      initiated the operation.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
+                      finished.
+                    "environmentParameters": {
+                        "str": {}  # Optional. Parameters object for the environment at the
+                          time of the operation.
+                    },
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                      started.
+                }
+
+                # JSON input template for discriminator value "Deploy":
+                environment_operation = {
+                    "kind": "Deploy",
+                    "operationId": "str",  # Unique identifier for the environment operation.
+                      Required.
+                    "status": "str",  # The operation status. Required. Known values are:
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "uri": "str",  # The unique URI for the environment operation. Required.
+                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
+                      initiated the operation.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
+                      finished.
+                    "environmentParameters": {
+                        "str": {}  # Optional. Parameters object for the environment at the
+                          time of the operation.
+                    },
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                      started.
+                }
+
+                # response body for status code(s): 200
+                response == environment_operation
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_environments_list_operations_request(
+                    project_name=project_name,
+                    user_id=user_id,
+                    environment_name=environment_name,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace_async
+    async def get_operation(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, operation_id: str, **kwargs: Any
+    ) -> JSON:
+        """Gets an environment action result.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: Environment name. Required.
+        :type environment_name: str
+        :param operation_id: Unique identifier for the environment operation. Required.
+        :type operation_id: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+                # The response is polymorphic. The following are possible polymorphic responses based
+                  off discriminator "kind":
+
+                # JSON input template for discriminator value "Delete":
+                environment_operation = {
+                    "kind": "Delete",
+                    "operationId": "str",  # Unique identifier for the environment operation.
+                      Required.
+                    "status": "str",  # The operation status. Required. Known values are:
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "uri": "str",  # The unique URI for the environment operation. Required.
+                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
+                      initiated the operation.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
+                      finished.
+                    "environmentParameters": {
+                        "str": {}  # Optional. Parameters object for the environment at the
+                          time of the operation.
+                    },
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                      started.
+                }
+
+                # JSON input template for discriminator value "Deploy":
+                environment_operation = {
+                    "kind": "Deploy",
+                    "operationId": "str",  # Unique identifier for the environment operation.
+                      Required.
+                    "status": "str",  # The operation status. Required. Known values are:
+                      "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "uri": "str",  # The unique URI for the environment operation. Required.
+                    "createdByObjectId": "str",  # Optional. The object ID of the actor which
+                      initiated the operation.
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The time the operation
+                      finished.
+                    "environmentParameters": {
+                        "str": {}  # Optional. Parameters object for the environment at the
+                          time of the operation.
+                    },
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The time the operation
+                      started.
+                }
+
+                # response body for status code(s): 200
+                response == environment_operation
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_environments_get_operation_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            operation_id=operation_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace_async
+    async def get_logs_by_operation(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, operation_id: str, **kwargs: Any
+    ) -> str:
+        """Gets the logs for an operation on an environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param operation_id: The id of the operation on an environment. Required.
+        :type operation_id: str
+        :return: str
+        :rtype: str
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[str] = kwargs.pop("cls", None)
+
+        request = build_environments_get_logs_by_operation_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            operation_id=operation_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(str, deserialized), {})
+
+        return cast(str, deserialized)
+
+    @distributed_trace_async
+    async def get_outputs(
+        self, endpoint: str, project_name: str, user_id: str, environment_name: str, **kwargs: Any
+    ) -> JSON:
+        """Gets Outputs from the environment.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Required.
+        :type user_id: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "outputs": {
+                        "str": {
+                            "sensitive": bool,  # Optional. Indicates if the value is
+                              sensitive.
+                            "type": "str",  # Optional. Type of the output value. Known
+                              values are: "array", "boolean", "number", "object", and "string".
+                            "value": {}  # Optional. The output value.
+                        }
+                    }
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_environments_get_outputs_request(
+            project_name=project_name,
+            user_id=user_id,
+            environment_name=environment_name,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
+        }
+        request.url = self._client.format_url(request.url, **path_format_arguments)
+
+        _stream = False
+        pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+            request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                await response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})
+
+        return cast(JSON, deserialized)
+
+    @distributed_trace
+    def list_artifacts_by_environment(
+        self, project_name: str, environment_name: str, user_id: str = "me", **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Lists the artifacts for an environment.
+
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Default value is "me".
+        :type user_id: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "createdTime": "2020-02-20 00:00:00",  # Optional. Time the artifact was
+                      created.
+                    "downloadUri": "str",  # Optional. Uri where the file contents can be
+                      downloaded.
+                    "fileSize": 0.0,  # Optional. Size of file in bytes, if the artifact is a
+                      file.
+                    "id": "str",  # Optional. Artifact identifier.
+                    "isDirectory": bool,  # Optional. Whether artifact is a directory.
+                    "lastModifiedTime": "2020-02-20 00:00:00",  # Optional. Time the artifact was
+                      last modified.
+                    "name": "str"  # Optional. Artifact name.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_environments_list_artifacts_by_environment_request(
+                    project_name=project_name,
+                    environment_name=environment_name,
+                    user_id=user_id,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url(
+                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
+                    ),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url(
+                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
+                    ),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def list_artifacts_by_environment_and_path(
+        self, project_name: str, environment_name: str, artifact_path: str, user_id: str = "me", **kwargs: Any
+    ) -> AsyncIterable[JSON]:
+        """Lists the artifacts for an environment at a specified path, or returns the file at the path.
+
+        :param project_name: The DevCenter Project upon which to execute operations. Required.
+        :type project_name: str
+        :param environment_name: The name of the environment. Required.
+        :type environment_name: str
+        :param artifact_path: The path of the artifact. Required.
+        :type artifact_path: str
+        :param user_id: The AAD object id of the user. If value is 'me', the identity is taken from the
+         authentication context. Default value is "me".
+        :type user_id: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.async_paging.AsyncItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "createdTime": "2020-02-20 00:00:00",  # Optional. Time the artifact was
+                      created.
+                    "downloadUri": "str",  # Optional. Uri where the file contents can be
+                      downloaded.
+                    "fileSize": 0.0,  # Optional. Size of file in bytes, if the artifact is a
+                      file.
+                    "id": "str",  # Optional. Artifact identifier.
+                    "isDirectory": bool,  # Optional. Whether artifact is a directory.
+                    "lastModifiedTime": "2020-02-20 00:00:00",  # Optional. Time the artifact was
+                      last modified.
+                    "name": "str"  # Optional. Artifact name.
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                request = build_environments_list_artifacts_by_environment_and_path_request(
+                    project_name=project_name,
+                    environment_name=environment_name,
+                    artifact_path=artifact_path,
+                    user_id=user_id,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url(
+                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
+                    ),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                path_format_arguments = {
+                    "endpoint": self._serialize.url(
+                        "self._config.endpoint", self._config.endpoint, "str", skip_quote=True
+                    ),
+                }
+                request.url = self._client.format_url(request.url, **path_format_arguments)
+
+            return request
+
+        async def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, AsyncList(list_of_elem)
+
+        async def get_next(next_link=None):
+            request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = await self._client._pipeline.run(  # pylint: disable=protected-access
+                request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    await response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response)
+
+            return pipeline_response
+
+        return AsyncItemPaged(get_next, extract_data)
+
+
+class OperationStatusesOperations:
+    """
+    .. warning::
+        **DO NOT** instantiate this class directly.
+
+        Instead, you should access the following operations through
+        :class:`~azure.developer.devcenter.aio.DevCenterClient`'s
+        :attr:`operation_statuses` attribute.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        input_args = list(args)
+        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
+        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
+        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
+        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
+
+    @distributed_trace_async
+    async def get(self, endpoint: str, project_name: str, operation_id: str, **kwargs: Any) -> JSON:
+        """Get the status of an operation.
+
+        :param endpoint: The DevCenter-specific URI to operate on. Required.
+        :type endpoint: str
+        :param project_name: Name of the project. Required.
+        :type project_name: str
+        :param operation_id: The operation id name. Required.
+        :type operation_id: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "id": "str",  # Fully qualified ID for the operation status. Required.
+                    "name": "str",  # The operation id name. Required.
+                    "status": "str",  # Provisioning state of the resource. Required. Known
+                      values are: "NotStarted", "Running", "Succeeded", "Failed", and "Canceled".
+                    "endTime": "2020-02-20 00:00:00",  # Optional. The end time of the operation.
+                    "error": {
+                        "code": "str",  # One of a server-defined set of error codes.
+                          Required.
+                        "message": "str",  # A human-readable representation of the error.
+                          Required.
+                        "details": [
+                            ...
+                        ],
+                        "innererror": {
+                            "code": "str",  # Optional. One of a server-defined set of
+                              error codes.
+                            "innererror": ...
+                        },
+                        "target": "str"  # Optional. The target of the error.
+                    },
+                    "percentComplete": 0.0,  # Optional. Percent of the operation that is
+                      complete.
+                    "properties": {},  # Optional. Custom operation properties, populated only
+                      for a successful operation.
+                    "resourceId": "str",  # Optional. The id of the resource.
+                    "startTime": "2020-02-20 00:00:00"  # Optional. The start time of the
+                      operation.
+                }
+        """
+        error_map = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        request = build_operation_statuses_get_request(
+            project_name=project_name,
+            operation_id=operation_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        path_format_arguments = {
+            "endpoint": self._serialize.url("endpoint", endpoint, "str", skip_quote=True),
         }
         request.url = self._client.format_url(request.url, **path_format_arguments)
 

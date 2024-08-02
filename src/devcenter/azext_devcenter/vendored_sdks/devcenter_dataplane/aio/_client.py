@@ -19,7 +19,7 @@ from .operations import (
     DevBoxesOperations,
     DevCenterOperations,
     EnvironmentsOperations,
-    ProjectsOperations,
+    OperationStatusesOperations,
 )
 
 if TYPE_CHECKING:
@@ -28,25 +28,26 @@ if TYPE_CHECKING:
 
 
 class DevCenterClient:  # pylint: disable=client-accepts-api-version-keyword
-    """DevBox API.
+    """DevCenter service.
 
-    :ivar dev_center: DevCenterOperations operations
-    :vartype dev_center: azure.developer.devcenter.aio.operations.DevCenterOperations
     :ivar dev_boxes: DevBoxesOperations operations
     :vartype dev_boxes: azure.developer.devcenter.aio.operations.DevBoxesOperations
-    :ivar projects: ProjectsOperations operations
-    :vartype projects: azure.developer.devcenter.aio.operations.ProjectsOperations
+    :ivar dev_center: DevCenterOperations operations
+    :vartype dev_center: azure.developer.devcenter.aio.operations.DevCenterOperations
     :ivar deployment_environments: DeploymentEnvironmentsOperations operations
     :vartype deployment_environments:
      azure.developer.devcenter.aio.operations.DeploymentEnvironmentsOperations
     :ivar environments: EnvironmentsOperations operations
     :vartype environments: azure.developer.devcenter.aio.operations.EnvironmentsOperations
+    :ivar operation_statuses: OperationStatusesOperations operations
+    :vartype operation_statuses:
+     azure.developer.devcenter.aio.operations.OperationStatusesOperations
     :param endpoint: The DevCenter-specific URI to operate on. Required.
     :type endpoint: str
     :param credential: Credential needed for the client to connect to Azure. Required.
     :type credential: ~azure.core.credentials_async.AsyncTokenCredential
-    :keyword api_version: Api Version. Default value is "2024-05-01-preview". Note that overriding
-     this default value may result in unsupported behavior.
+    :keyword api_version: Api Version. Default value is "2024-08-15-privatepreview". Note that
+     overriding this default value may result in unsupported behavior.
     :paramtype api_version: str
     :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
      Retry-After header is present.
@@ -60,13 +61,15 @@ class DevCenterClient:  # pylint: disable=client-accepts-api-version-keyword
         self._serialize = Serializer()
         self._deserialize = Deserializer()
         self._serialize.client_side_validation = False
-        self.dev_center = DevCenterOperations(self._client, self._config, self._serialize, self._deserialize)
         self.dev_boxes = DevBoxesOperations(self._client, self._config, self._serialize, self._deserialize)
-        self.projects = ProjectsOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.dev_center = DevCenterOperations(self._client, self._config, self._serialize, self._deserialize)
         self.deployment_environments = DeploymentEnvironmentsOperations(
             self._client, self._config, self._serialize, self._deserialize
         )
         self.environments = EnvironmentsOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.operation_statuses = OperationStatusesOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
 
     def send_request(self, request: HttpRequest, **kwargs: Any) -> Awaitable[AsyncHttpResponse]:
         """Runs the network request through the client's chained policies.
