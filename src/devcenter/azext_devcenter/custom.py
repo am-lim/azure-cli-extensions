@@ -1203,6 +1203,27 @@ def devcenter_dev_box_list_low_usage_dev_boxes_by_user(
         endpoint=endpoint
     )
 
+def devcenter_dev_box_list_high_usage_dev_boxes_by_user(
+    cmd,
+    project_name,
+    days,
+    hours,
+    user_id="me",
+    dev_center=None,
+    endpoint=None,
+):
+    
+    cf_dataplane = cf_devcenter_dataplane(
+        cmd.cli_ctx, endpoint, dev_center, project_name
+    )
+    return cf_dataplane.dev_boxes.list_high_usage_dev_boxes_by_user(
+        project_name=project_name, 
+        user_id=user_id, 
+        days=days,
+        hours=hours,
+        endpoint=endpoint
+    )
+
 def devcenter_environment_list(
     cmd, project_name, user_id=None, dev_center=None, endpoint=None
 ):

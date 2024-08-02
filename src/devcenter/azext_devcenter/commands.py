@@ -348,6 +348,7 @@ def load_command_table(self, _):
         g.custom_command("list-sessions", "devcenter_dev_box_list_dev_box_sessions")
         g.custom_command("list-inactive", "devcenter_dev_box_list_inactive_dev_boxes_by_user")
         g.custom_command("list-low-usage", "devcenter_dev_box_list_low_usage_dev_boxes_by_user")
+        g.custom_command("list-high-usage", "devcenter_dev_box_list_high_usage_dev_boxes_by_user")
 
     with self.command_group("devcenter dev environment") as g:
         g.custom_command("list", "devcenter_environment_list")

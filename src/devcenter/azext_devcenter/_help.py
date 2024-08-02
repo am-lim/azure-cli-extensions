@@ -472,6 +472,22 @@ helps[
 """
 
 helps[
+    "devcenter dev dev-box list-high-usage"
+] = """
+    type: command
+    short-summary: "List Dev Boxes that have seen more than the indicated hours of usage over the given number of days, which are considered high usage."
+    examples:
+      - name: List high usage dev boxes using dev center
+        text: |-
+               az devcenter dev dev-box list-high-usage --hours 20 --days 7 --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: List high usage dev boxes using endpoint
+        text: |-
+               az devcenter dev dev-box list-high-usage --hours 20 --days 7 --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+helps[
     "devcenter dev environment"
 ] = """
     type: group
