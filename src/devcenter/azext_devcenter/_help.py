@@ -423,6 +423,74 @@ helps[
 "schedule-default" --user-id "00000000-0000-0000-0000-000000000000"
 """
 
+#TODO
+helps[
+    "devcenter dev dev-box show-snapshot"
+] = """
+    type: command
+    short-summary: "Attempts automated repair steps to resolve common problems on a Dev Box. The dev box may restart during this operation."
+    examples:
+      - name: Repair using dev center
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --dev-center-name "ContosoDevCenter" \
+               --project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: Repair using endpoint
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+#TODO
+helps[
+    "devcenter dev dev-box list-snapshot"
+] = """
+    type: command
+    short-summary: "Attempts automated repair steps to resolve common problems on a Dev Box. The dev box may restart during this operation."
+    examples:
+      - name: Repair using dev center
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --dev-center-name "ContosoDevCenter" \
+               --project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: Repair using endpoint
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+#TODO
+helps[
+    "devcenter dev dev-box capture-snapshot"
+] = """
+    type: command
+    short-summary: "Attempts automated repair steps to resolve common problems on a Dev Box. The dev box may restart during this operation."
+    examples:
+      - name: Repair using dev center
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --dev-center-name "ContosoDevCenter" \
+               --project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: Repair using endpoint
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+#TODO
+helps[
+    "devcenter dev dev-box restore-snapshot"
+] = """
+    type: command
+    short-summary: "Attempts automated repair steps to resolve common problems on a Dev Box. The dev box may restart during this operation."
+    examples:
+      - name: Repair using dev center
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --dev-center-name "ContosoDevCenter" \
+               --project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: Repair using endpoint
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
 helps[
     "devcenter dev environment"
 ] = """
