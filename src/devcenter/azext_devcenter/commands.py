@@ -321,6 +321,9 @@ def load_command_table(self, _):
         g.custom_command("list", "devcenter_schedule_list_dp")
         g.custom_show_command("show", "devcenter_schedule_show_dp")
 
+    with self.command_group("devcenter dev image-build-logs", dev_boxes_dp) as g:
+        g.custom_show_command("show", "devcenter_image_build_logs_show") \
+
     with self.command_group("devcenter dev dev-box") as g:
         g.custom_command("list", "devcenter_dev_box_list")
         g.custom_show_command("show", "devcenter_dev_box_show")
@@ -345,6 +348,10 @@ def load_command_table(self, _):
         g.custom_command("delay-all-actions", "devcenter_dev_box_delay_all_actions")
         g.custom_command("list-operation", "devcenter_dev_box_list_operation")
         g.custom_command("show-operation", "devcenter_dev_box_show_operation")
+        g.custom_command("list-snapshot", "devcenter_dev_box_list_snapshot")
+        g.custom_command("show-snapshot", "devcenter_dev_box_show_snapshot")
+        g.custom_command("capture-snapshot", "devcenter_dev_box_capture_snapshot")
+        g.custom_command("restore-snapshot", "devcenter_dev_box_restore_snapshot")
 
     with self.command_group("devcenter dev environment") as g:
         g.custom_command("list", "devcenter_environment_list")
