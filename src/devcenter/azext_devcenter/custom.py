@@ -803,6 +803,17 @@ def devcenter_pool_show_dp(
         project_name=project_name, pool_name=pool_name
     )
 
+def devcenter_image_build_logs_show_dp(
+    cmd, project_name, image_build_log_id, dev_center=None, endpoint=None
+):
+    cf_dataplane = cf_devcenter_dataplane(
+        cmd.cli_ctx, endpoint, dev_center, project_name
+    )
+    
+    return cf_dataplane.dev_boxes.get_image_build_logs(
+        project_name=project_name, image_build_log_id=image_build_log_id
+    )
+
 
 def devcenter_schedule_list_dp(
     cmd, project_name, pool_name=None, dev_center=None, endpoint=None
@@ -1114,6 +1125,67 @@ def devcenter_dev_box_delay_all_actions(
         until=delayed_time,
     )
 
+def devcenter_dev_box_list_snapshot(
+    cmd, project_name, dev_box_name, user_id="me", dev_center=None, endpoint=None
+):
+    cf_dataplane = cf_devcenter_dataplane(
+        cmd.cli_ctx, endpoint, dev_center, project_name
+    )
+    return cf_dataplane.dev_boxes.list_snapshots(
+        project_name=project_name, user_id=user_id, dev_box_name=dev_box_name
+    )
+
+
+def devcenter_dev_box_show_snapshot(
+    cmd,
+    project_name,
+    dev_box_name,
+    snapshot_id,
+    user_id="me",
+    dev_center=None,
+    endpoint=None,
+):
+    cf_dataplane = cf_devcenter_dataplane(
+        cmd.cli_ctx, endpoint, dev_center, project_name
+    )
+
+    return cf_dataplane.dev_boxes.get_snapshot(
+        project_name=project_name,
+        user_id=user_id,
+        dev_box_name=dev_box_name,
+        snapshot_id=snapshot_id,
+    )
+
+def devcenter_dev_box_capture_snapshot(
+    cmd, project_name, dev_box_name, user_id="me", dev_center=None, endpoint=None
+):
+    cf_dataplane = cf_devcenter_dataplane(
+        cmd.cli_ctx, endpoint, dev_center, project_name
+    )
+    return cf_dataplane.dev_boxes.capture_snapshot(
+        project_name=project_name, user_id=user_id, dev_box_name=dev_box_name
+    )
+
+
+def devcenter_dev_box_restore_snapshot(
+    cmd,
+    project_name,
+    dev_box_name,
+    snapshot_id,
+    user_id="me",
+    dev_center=None,
+    endpoint=None,
+):
+    cf_dataplane = cf_devcenter_dataplane(
+        cmd.cli_ctx, endpoint, dev_center, project_name
+    )
+
+    return cf_dataplane.dev_boxes.restore_snapshot(
+        project_name=project_name,
+        user_id=user_id,
+        dev_box_name=dev_box_name,
+        snapshot_id=snapshot_id,
+    )
 
 def devcenter_dev_box_list_operation(
     cmd, project_name, dev_box_name, user_id="me", dev_center=None, endpoint=None
@@ -1256,6 +1328,7 @@ def devcenter_environment_delete(
     project_name,
     no_wait=False,
     user_id="me",
+    force=None,
     dev_center=None,
     endpoint=None,
 ):
@@ -1268,6 +1341,7 @@ def devcenter_environment_delete(
         project_name=project_name,
         user_id=user_id,
         environment_name=environment_name,
+        force=force,
     )
 
 
