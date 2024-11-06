@@ -136,6 +136,22 @@ helps[
 """
 
 helps[
+    "devcenter dev image-build-logs show"
+] = """
+    type: command
+    short-summary: "Gets the log for an imaging build task."
+    examples:
+      - name: Get using dev center
+        text: |-
+               az devcenter dev image-build-logs  show--dev-center-name "ContosoDevCenter" \ 
+ --project-name "DevProject" --image-build-log-id "91835dc0-ef5a-4f58-9e3a-099aea8481f4"
+      - name: Get using endpoint
+        text: |-
+               az devcenter dev image-build-logs show --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject"--image-build-log-id "91835dc0-ef5a-4f58-9e3a-099aea8481f4"
+"""
+
+helps[
     "devcenter dev dev-box"
 ] = """
     type: group
@@ -421,6 +437,70 @@ helps[
                az devcenter dev dev-box skip-action --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
 --project-name "DevProject" --name "myDevBox" --action-name \
 "schedule-default" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+helps[
+    "devcenter dev dev-box show-snapshot"
+] = """
+    type: command
+    short-summary: "Gets a snapshot by snapshot id."
+    examples:
+      - name: Get snapshot using dev center
+        text: |-
+               az devcenter dev dev-box show-snapshot --name "myDevBox" --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000" --snapshot-id "CPC_974f0852-a0f4-4a9f-8ce7-d0d0d7a604cf_9b656834-3563-4bca-93c6-f90cfa3c6797"
+      - name: Get snapshot using endpoint
+        text: |-
+               az devcenter dev dev-box show-snapshot --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000" --snapshot-id "CPC_974f0852-a0f4-4a9f-8ce7-d0d0d7a604cf_9b656834-3563-4bca-93c6-f90cfa3c6797"
+"""
+
+helps[
+    "devcenter dev dev-box list-snapshot"
+] = """
+    type: command
+    short-summary: "Lists snapshots for this Dev Box."
+    examples:
+      - name: List snapshots using dev center
+        text: |-
+               az devcenter dev dev-box list-snapshot --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --name "myDevBox" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: List snapshots using endpoint
+        text: |-
+               az devcenter dev dev-box list-snapshot --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+helps[
+    "devcenter dev dev-box capture-snapshot"
+] = """
+    type: command
+    short-summary: "Captures a manual snapshot of the Dev Box."
+    examples:
+      - name: Capture snapshot using dev center
+        text: |-
+               az devcenter dev dev-box capture-snapshot --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --name "myDevBox" --user-id "00000000-0000-0000-0000-000000000000"
+      - name: Capture snapshot using endpoint
+        text: |-
+               az devcenter dev dev-box capture-snapshot --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000"
+"""
+
+helps[
+    "devcenter dev dev-box restore-snapshot"
+] = """
+    type: command
+    short-summary: "Restores a Dev Box to a specified snapshot."
+    examples:
+      - name: Restore using dev center
+        text: |-
+               az devcenter dev dev-box restore-snapshot --dev-center-name "ContosoDevCenter" \
+--project-name "DevProject" --name "myDevBox" --user-id "00000000-0000-0000-0000-000000000000" --snapshot-id "CPC_974f0852-a0f4-4a9f-8ce7-d0d0d7a604cf_9b656834-3563-4bca-93c6-f90cfa3c6797"
+      - name: Restore using endpoint
+        text: |-
+               az devcenter dev dev-box repair --name "MyDevBox" --endpoint "https://8a40af38-3b4c-4672-a6a4-5e964b1870ed-contosodevcenter.centralus.devcenter.azure.com/" \
+--project-name "DevProject" --user-id "00000000-0000-0000-0000-000000000000" --snapshot-id "CPC_974f0852-a0f4-4a9f-8ce7-d0d0d7a604cf_9b656834-3563-4bca-93c6-f90cfa3c6797"
 """
 
 helps[
